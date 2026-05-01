@@ -186,41 +186,46 @@ def get_exams_via_portal(student_id: str, password: str) -> Optional[str]:
         print("[Exam] 正在查找'查询'按钮...")
         time.sleep(2)
 
-        # 尝试多种可能的查询按钮选择器
-        query_selectors = [
-            "text:查询",
-            'xpath://input[@value="查询"]',
-            'xpath://button[contains(text(),"查询")]',
-            'xpath://a[contains(text(),"查询")]',
-            'xpath://span[contains(text(),"查询")]',
-            "#queryBtn",
-            "#searchBtn",
-            "#btnSearch",
-            'xpath://input[@type="submit"]',
-        ]
-
+        # 强智系统查询按钮通常是 <input id="btn_query" value="查 询" onclick="queryKsap()">
+        # 优先用ID选择器，再尝试其他方式
         query_clicked = False
-        for sel in query_selectors:
-            try:
-                btn = active_page.ele(sel, timeout=1)
-                if btn:
-                    print(f"[Exam] 找到查询按钮: {sel}")
-                    btn.click()
-                    query_clicked = True
-                    time.sleep(3)
-                    break
-            except:
-                continue
+        try:
+            btn = active_page.ele("#btn_query", timeout=3)
+            if btn:
+                print("[Exam] 找到查询按钮 #btn_query")
+                btn.click()
+                query_clicked = True
+                time.sleep(3)
+        except:
+            pass
 
         if not query_clicked:
-            print("[Exam] 未自动找到查询按钮")
+            # fallback: 执行JS函数
+            try:
+                active_page.run_js("queryKsap()")
+                print("[Exam] 通过JS调用 queryKsap()")
+                query_clicked = True
+                time.sleep(3)
+            except Exception as e:
+                print(f"[Exam] JS调用失败: {e}")
+
+        if not query_clicked:
+            print("[Exam] 未自动触发查询")
             print("    请在浏览器中手动点击'查询'按钮")
             input("    完成后按回车继续: ")
         else:
-            print("[Exam] 已点击查询，等待结果...")
+            print("[Exam] 已触发查询，等待结果加载...")
 
-        # 等待数据加载
-        time.sleep(3)
+        # 等待表单提交和页面加载（POST到 xsksap_list）
+        time.sleep(5)
+
+        # 检查URL是否变成了列表页
+        ok, url = _poll_url_change(active_page, ["xsksap_list"], timeout_sec=15)
+        if ok:
+            print(f"[Exam] 查询结果页: {url}")
+        else:
+            print(f"[Exam] 当前URL: {active_page.url}")
+            # 即使URL没变，也可能通过AJAX加载了数据
 
         # ===== Step 7: 获取最终HTML =====
         final_url = active_page.url
