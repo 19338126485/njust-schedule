@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Node
+node_modules/
+package-lock.json
+
+# Android (Capacitor)
+android/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 敏感文件
+src/config.py
+*.jpg
+*.png
+!webapp/icons/*.png
+
+# 临时文件
+*.tmp
+*.log
