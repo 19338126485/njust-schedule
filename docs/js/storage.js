@@ -96,5 +96,9 @@
   function clearExams() {
     localStorage.removeItem('njust_exams_data');
   }
-  window.Storage = { loadCourses, saveCourses, getStartDate, setStartDate, exportToFile, importFromFile, loadExams, saveExams, clearExams };
+  // 清除课表数据（用于刷新）
+  function clearCourses() {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+  window.Storage = { loadCourses, saveCourses, getStartDate, setStartDate, exportToFile, importFromFile, loadExams, saveExams, clearCourses, clearExams };
 })();

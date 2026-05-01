@@ -174,23 +174,50 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.target === aboutModalOverlay) aboutModalOverlay.hidden = true;
   });
 
-  // 刷新数据（清除localStorage缓存，重新fetch）
+  // 刷新数据（清除localStorage缓存，重新fetch课表+考试）
   const btnRefresh = document.getElementById('btn-refresh');
   if (btnRefresh) {
     btnRefresh.addEventListener('click', async () => {
       closeMenu();
-      if (!confirm('清除本地缓存并重新拉取最新数据？')) return;
+      if (!confirm('清除本地缓存并重新拉取最新课表和考试数据？')) return;
+
+      // 清除缓存
+      Storage.clearCourses();
       Storage.clearExams();
+
+      let msg = '';
+
+      // 重新拉取课表
+      try {
+        const res = await fetch('data/schedule.json?v=' + Date.now());
+        if (res.ok) {
+          const courses = await res.json();
+          Storage.saveCourses(courses);
+          // 重新渲染课表
+          Schedule.init(courses);
+          msg += '课表已更新！共 ' + courses.length + ' 个时间段\n';
+        } else {
+          msg += '课表拉取失败\n';
+        }
+      } catch (e) {
+        msg += '课表拉取失败: ' + e.message + '\n';
+      }
+
+      // 重新拉取考试
       try {
         const res = await fetch('data/exams.json?v=' + Date.now());
         if (res.ok) {
           const exams = await res.json();
           Storage.saveExams(exams);
-          alert('考试数据已更新！\n共 ' + exams.length + ' 场考试');
+          msg += '考试已更新！共 ' + exams.length + ' 场考试';
+        } else {
+          msg += '考试拉取失败';
         }
       } catch (e) {
-        alert('拉取失败: ' + e.message);
+        msg += '考试拉取失败: ' + e.message;
       }
+
+      alert(msg);
     });
   }
 });
