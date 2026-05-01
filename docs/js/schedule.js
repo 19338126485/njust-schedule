@@ -237,9 +237,48 @@
     render();
   }
 
+  // 旧格式兼容转换（kcmc/kcsj → name/day/startJie/endJie）
+  function migrateOldFormat(data) {
+    if (!Array.isArray(data) || data.length === 0) return data;
+    // 检测第一条数据是否是旧格式
+    const first = data[0];
+    if (first.name !== undefined || first.day !== undefined) return data; // 已经是新格式
+    if (!first.kcmc || !first.kcsj) return data; // 不是已知格式，原样返回
+
+    console.log('[Schedule] 检测到旧格式数据，自动转换...');
+    const weekdayMap = {'一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '日': 7};
+    const result = [];
+    for (const item of data) {
+      const kcsj = item.kcsj || '';
+      if (kcsj.length < 3) continue;
+      const day = parseInt(kcsj[0], 10);
+      const jieList = [];
+      for (let i = 1; i < kcsj.length; i += 2) {
+        if (i + 1 < kcsj.length) {
+          jieList.push(parseInt(kcsj.substring(i, i + 2), 10));
+        }
+      }
+      if (jieList.length === 0) continue;
+      const startJie = Math.min(...jieList);
+      const endJie = Math.max(...jieList);
+      const color = (item.kcmc.split('').reduce((s, c) => s + c.charCodeAt(0), 0) % 10) + 1;
+      result.push({
+        name: item.kcmc,
+        teacher: item.jsxm || '',
+        location: item.jsmc || '',
+        day: day,
+        startJie: startJie,
+        endJie: endJie,
+        weeks: item.kkzc || '1-16',
+        color: color
+      });
+    }
+    return result;
+  }
+
   // ===== 初始化 =====
   function init(data) {
-    courses = data || [];
+    courses = migrateOldFormat(data || []);
     currentWeek = getCurrentWeek();
     render();
 

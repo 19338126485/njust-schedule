@@ -6,9 +6,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 1. 加载课表数据（优先localStorage，其次schedule.json）
   let courses = Storage.loadCourses();
 
-  if (!courses) {
+  // 检测旧格式（有kcmc字段但缺少name/day/startJie）或空数组，强制重新拉取
+  if (courses && courses.length > 0 && !courses[0].name) {
+    console.warn('检测到旧格式课表数据，清除缓存并重新拉取');
+    Storage.saveCourses([]);
+    courses = null;
+  }
+  if (!courses || !courses.length) {
     try {
-      const res = await fetch('data/schedule.json');
+      const res = await fetch('data/schedule.json?v=' + Date.now());
       if (res.ok) {
         courses = await res.json();
         Storage.saveCourses(courses);
