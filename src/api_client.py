@@ -249,7 +249,19 @@ class QiangzhiClient:
                 start_time = JIE_START.get(start_jie_num, "08:00")
                 end_time = JIE_END.get(end_jie_num, "09:35")
 
+                # 自动分配颜色（按课程名哈希）
+                color = (sum(ord(c) for c in course_name) % 10) + 1
+
                 courses.append({
+                    "name": course_name,
+                    "teacher": teacher,
+                    "location": loc,
+                    "day": weekday,
+                    "startJie": start_jie_num,
+                    "endJie": end_jie_num,
+                    "weeks": weeks_str,
+                    "color": color,
+                    # 保留强智原始字段供兼容
                     "kcmc": course_name,
                     "jsxm": teacher,
                     "jsmc": loc,
