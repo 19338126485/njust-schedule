@@ -1,0 +1,15 @@
+[
+  {"day":3, "startJie":6, "endJie":7, "name":"体育（Ⅳ）", "teacher":"任明", "location":"江阴运动场东跑道", "weeks":"1-16", "color":0},
+  {"day":1, "startJie":1, "endJie":3, "name":"模拟电路与数字电路", "teacher":"刘豫晋", "location":"江阴格物C103", "weeks":"1-16", "color":1},
+  {"day":1, "startJie":4, "endJie":5, "name":"模电实验", "teacher":"刘学敏", "location":"", "weeks":"16", "color":2},
+  {"day":2, "startJie":4, "endJie":5, "name":"工程数学", "teacher":"刘禹彤", "location":"江阴格物C303", "weeks":"1-12", "color":3},
+  {"day":2, "startJie":6, "endJie":7, "name":"概率与统计", "teacher":"陆中胜,侯传志", "location":"江阴格物C302", "weeks":"1-12", "color":4},
+  {"day":3, "startJie":4, "endJie":5, "name":"智能产品设计与分析基础（Ⅰ）", "teacher":"王帆", "location":"江阴致远A104", "weeks":"1-8", "color":5},
+  {"day":4, "startJie":1, "endJie":3, "name":"模电实验", "teacher":"刘学敏", "location":"", "weeks":"16", "color":2},
+  {"day":4, "startJie":6, "endJie":7, "name":"硬件系统设计基础", "teacher":"秦正", "location":"江阴致远A204", "weeks":"8-15", "color":6},
+  {"day":4, "startJie":8, "endJie":9, "name":"概率与统计", "teacher":"陆中胜,侯传志", "location":"江阴格物C302", "weeks":"1-7,9-12", "color":4},
+  {"day":5, "startJie":2, "endJie":3, "name":"智能产品设计与分析基础（Ⅰ）", "teacher":"王帆", "location":"江阴致远A104", "weeks":"1-8", "color":5},
+  {"day":5, "startJie":4, "endJie":5, "name":"工程数学", "teacher":"刘禹彤", "location":"江阴格物C303", "weeks":"1-12", "color":3},
+  {"day":1, "startJie":8, "endJie":9, "name":"毛泽东思想和中国特色社会主义理论体系概论", "teacher":"吕彪", "location":"江阴致源B205", "weeks":"1-14", "color":7},
+  {"day":7, "startJie":1, "endJie":3, "name":"工程力学实验", "teacher":"陈涛", "location":"", "weeks":"16", "color":8}
+]

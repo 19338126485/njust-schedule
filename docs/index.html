@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#2d8cf0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>南理工课表</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="css/style.css?v=4">
+</head>
+<body>
+
+<!-- 顶部栏 -->
+<header class="app-header">
+  <h1>课表查询</h1>
+  <button id="btn-menu" class="icon-btn" aria-label="菜单">⋯</button>
+</header>
+
+<!-- 日期标签行 -->
+<div class="date-bar" id="date-bar">
+  <!-- JS 动态生成：周一 4/27 -->
+</div>
+
+<!-- 课表主体 -->
+<div class="schedule-wrapper">
+  <div class="schedule-grid" id="schedule-grid">
+    <!-- JS 动态生成 -->
+  </div>
+</div>
+
+<!-- 底部导航 -->
+<footer class="bottom-bar">
+  <span id="today-label" class="today-label">星期五</span>
+  <button id="btn-prev-week" class="nav-btn">◀</button>
+  <span id="week-label" class="week-label">△ 第9周</span>
+  <button id="btn-next-week" class="nav-btn">▶</button>
+  <button id="btn-view-toggle" class="view-btn">周</button>
+</footer>
+
+<!-- 菜单面板 -->
+<div class="menu-overlay" id="menu-overlay" hidden>
+  <div class="menu-panel" id="menu-panel">
+    <h3>菜单</h3>
+    <button class="menu-item" id="btn-import">
+      <span class="menu-icon">📥</span> 导入课表
+      <input type="file" id="file-import" accept=".json" hidden>
+    </button>
+    <button class="menu-item" id="btn-export">📤 导出课表</button>
+    <button class="menu-item" id="btn-set-date">📅 设置开学日期</button>
+    <button class="menu-item" id="btn-about">ℹ️ 关于</button>
+    <button class="btn-primary" id="btn-menu-close">关闭</button>
+  </div>
+</div>
+
+<!-- 开学日期设置弹窗 -->
+<div class="modal-overlay" id="date-modal-overlay" hidden>
+  <div class="modal-card">
+    <h2>设置开学日期</h2>
+    <p>格式：YYYY-MM-DD（开学第一周周一）</p>
+    <input type="date" id="date-input" class="date-input">
+    <button id="btn-date-save" class="btn-primary">保存</button>
+    <button id="btn-date-cancel" class="btn-secondary">取消</button>
+  </div>
+</div>
+
+<!-- 关于弹窗 -->
+<div class="modal-overlay" id="about-modal-overlay" hidden>
+  <div class="modal-card">
+    <h2>南理工课表</h2>
+    <p>个人课表查询工具</p>
+    <p>数据离线存储，密码不上传</p>
+    <p>Version 1.0</p>
+    <button id="btn-about-close" class="btn-primary">关闭</button>
+  </div>
+</div>
+
+<!-- 课程详情弹窗 -->
+<div class="modal-overlay" id="modal-overlay" hidden>
+  <div class="modal-card" id="modal-card">
+    <h2 id="modal-title">课程名称</h2>
+    <p id="modal-time">时间</p>
+    <p id="modal-location">地点</p>
+    <p id="modal-teacher">教师</p>
+    <p id="modal-weeks">周次</p>
+    <button id="btn-modal-close" class="btn-primary">关闭</button>
+  </div>
+</div>
+
+<script src="js/schedule.js?v=9"></script>
+<script src="js/storage.js?v=9"></script>
+<script src="js/app.js?v=9"></script>
+</body>
+</html>
