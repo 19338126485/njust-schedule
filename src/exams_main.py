@@ -73,23 +73,36 @@ def main():
         print("\n   HTML已保存到 ~/Desktop/njust_exams_page.html")
         print("   请查看文件内容确认实际状态")
 
-    # 尝试简单提取表格内容
+    # 尝试解析
     try:
-        from bs4 import BeautifulSoup
-        soup = BeautifulSoup(html, "html.parser")
-        tables = soup.find_all("table")
-        print(f"\n[Debug] 页面包含 {len(tables)} 个表格")
-        for i, table in enumerate(tables[:3]):
-            rows = table.find_all("tr")
-            print(f"  表格#{i}: {len(rows)} 行")
-            if rows:
-                for j, row in enumerate(rows[:3]):
-                    cells = row.find_all(["td", "th"])
-                    texts = [c.get_text(strip=True) for c in cells]
-                    if any(texts):
-                        print(f"    行{j}: {texts}")
+        from src.exam_parser import parse_exam_html, print_exams
+        exams = parse_exam_html(html)
+        print_exams(exams)
+
+        # 保存为JSON
+        import json
+        # 跨平台获取桌面路径（中文Windows是"桌面"）
+        desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+        if not os.path.exists(desktop_path):
+            desktop_path = os.path.join(os.path.expanduser("~"), "桌面")
+        json_path = os.path.join(desktop_path, "njust_exams.json")
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(exams, f, ensure_ascii=False, indent=2)
+        print(f"\n📄 考试数据已保存: {json_path}")
+
+        # 同时更新webapp的考试数据
+        webapp_exam_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "webapp", "data", "exams.json"
+        )
+        os.makedirs(os.path.dirname(webapp_exam_path), exist_ok=True)
+        with open(webapp_exam_path, "w", encoding="utf-8") as f:
+            json.dump(exams, f, ensure_ascii=False, indent=2)
+        print(f"📄 PWA考试数据已更新: {webapp_exam_path}")
+
     except Exception as e:
-        print(f"\n[Debug] 表格分析失败: {e}")
+        print(f"\n⚠️ 解析失败: {e}")
+        print("   HTML已保存，可手动分析")
 
 
 if __name__ == "__main__":
