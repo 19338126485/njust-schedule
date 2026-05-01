@@ -33,6 +33,28 @@ def _safe_import_drission():
 PORTAL_URL = "https://ehall.njust.edu.cn/new/index.html"
 
 
+def find_and_click(page_obj, text_keywords, desc=""):
+    """在页面上查找包含指定文本的元素并点击"""
+    for keyword in text_keywords:
+        selectors = [
+            f"text:{keyword}",
+            f'xpath://a[contains(text(),"{keyword}")]',
+            f'xpath://span[contains(text(),"{keyword}")]',
+            f'xpath://div[contains(text(),"{keyword}")]',
+            f'xpath://li[contains(text(),"{keyword}")]',
+        ]
+        for sel in selectors:
+            try:
+                ele = page_obj.ele(sel, timeout=1)
+                if ele:
+                    print(f"[Portal] {desc}找到: '{keyword}'")
+                    ele.click()
+                    return True
+            except:
+                continue
+    return False
+
+
 def _poll_url_change(page, expected_substrings, timeout_sec=30, check_interval=2):
     """轮询等待URL变化到包含指定子串的页面"""
     waited = 0
@@ -153,26 +175,6 @@ def get_schedule_via_portal(student_id: str, password: str) -> Optional[str]:
         # ===== Step 3: 点击"教务系统" =====
         print("[Portal] 正在查找并点击'教务系统'...")
         time.sleep(2)
-
-        def find_and_click(page_obj, text_keywords, desc=""):
-            for keyword in text_keywords:
-                selectors = [
-                    f"text:{keyword}",
-                    f'xpath://a[contains(text(),"{keyword}")]',
-                    f'xpath://span[contains(text(),"{keyword}")]',
-                    f'xpath://div[contains(text(),"{keyword}")]',
-                    f'xpath://li[contains(text(),"{keyword}")]',
-                ]
-                for sel in selectors:
-                    try:
-                        ele = page_obj.ele(sel, timeout=1)
-                        if ele:
-                            print(f"[Portal] {desc}找到: '{keyword}'")
-                            ele.click()
-                            return True
-                    except:
-                        continue
-            return False
 
         clicked = find_and_click(active_page, ["本科教务", "教务系统", "教务管理"], "主入口")
 
