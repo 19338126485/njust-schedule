@@ -9,6 +9,7 @@ const PRECACHE = [
   './js/schedule.js',
   './js/storage.js',
   './data/schedule.json',
+  './data/exams.json',
   './manifest.json'
 ];
 
