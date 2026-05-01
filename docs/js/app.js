@@ -22,6 +22,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 兜底空数据
   if (!courses) courses = [];
 
+  // 1b. 加载考试数据（优先localStorage，其次exams.json）
+  let exams = Storage.loadExams();
+  if (!exams) {
+    try {
+      const res = await fetch('data/exams.json');
+      if (res.ok) {
+        exams = await res.json();
+        Storage.saveExams(exams);
+        console.log('Loaded from exams.json');
+      }
+    } catch (e) {
+      console.error('Failed to load exams.json:', e);
+    }
+  }
+  if (!exams) exams = [];
+
   // 2. 初始化课表渲染
   Schedule.init(courses);
 
@@ -53,6 +69,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const menuPanel = document.getElementById('menu-panel');
   const dateModalOverlay = document.getElementById('date-modal-overlay');
   const aboutModalOverlay = document.getElementById('about-modal-overlay');
+  const examsModalOverlay = document.getElementById('exams-modal-overlay');
+  const examsContent = document.getElementById('exams-content');
 
   function openMenu() { menuOverlay.hidden = false; }
   function closeMenu() { menuOverlay.hidden = true; }
@@ -60,6 +78,35 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-menu').addEventListener('click', openMenu);
   document.getElementById('btn-menu-close').addEventListener('click', closeMenu);
   menuOverlay.addEventListener('click', (e) => { if (e.target === menuOverlay) closeMenu(); });
+
+  // 考试安排
+  function renderExams() {
+    const examData = Storage.loadExams() || [];
+    if (!examData.length) {
+      examsContent.innerHTML = '<p class="empty-state">暂无考试数据<br><br>请在电脑端运行<br><code>python -m src.exams_main</code><br>更新考试安排</p>';
+      return;
+    }
+    let html = '<table class="exam-table">';
+    html += '<tr><th>课程</th><th>时间</th><th>考场</th><th>座位</th></tr>';
+    for (const e of examData) {
+      const time = e.date ? `${e.date} ${e.start_time || ''}~${e.end_time || ''}` : (e.exam_time || '');
+      html += `<tr><td>${e.course_name || ''}</td><td>${time}</td><td>${e.room || ''}</td><td>${e.seat || ''}</td></tr>`;
+    }
+    html += '</table>';
+    examsContent.innerHTML = html;
+  }
+
+  document.getElementById('btn-exams').addEventListener('click', () => {
+    renderExams();
+    examsModalOverlay.hidden = false;
+    closeMenu();
+  });
+  document.getElementById('btn-exams-close').addEventListener('click', () => {
+    examsModalOverlay.hidden = true;
+  });
+  examsModalOverlay.addEventListener('click', (e) => {
+    if (e.target === examsModalOverlay) examsModalOverlay.hidden = true;
+  });
 
   // 导入课表
   document.getElementById('btn-import').addEventListener('click', () => {

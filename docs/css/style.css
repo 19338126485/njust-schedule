@@ -346,7 +346,33 @@ body {
 .menu-item:active { background: #e8e9ea; }
 .menu-icon { font-size: 18px; }
 
-/* ========== 日视图 ========== */
+/* ========== 考试表格 ========== */
+.exam-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 8px;
+}
+.exam-table th {
+  background: #f5f6fa;
+  padding: 10px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 2px solid #e0e0e0;
+}
+.exam-table td {
+  padding: 12px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  color: #555;
+  line-height: 1.4;
+}
+.exam-table tr:last-child td {
+  border-bottom: none;
+}
+.exam-table tr:active {
+  background: #f8f9fa;
+}
 .day-view {
   display: none;
   flex-direction: column;
