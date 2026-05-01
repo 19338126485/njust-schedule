@@ -27,36 +27,43 @@ from src.config import STUDENT_ID, PASSWORD
 
 
 def update_schedule():
-    """抓取课表并保存"""
+    """抓取课表并保存（优先requests，失败则用浏览器兜底）"""
     print("\n" + "=" * 60)
     print("📚 正在抓取课表...")
     print("=" * 60)
 
-    # IDS登录
+    html = None
+    courses = None
+
+    # 尝试1: requests IDS登录
+    print("[Update] 尝试 requests IDS 登录...")
     from src.ids_auth import NJUSTIDSAuth
     auth = NJUSTIDSAuth(STUDENT_ID, PASSWORD)
-    if not auth.login():
-        print("❌ IDS登录失败")
-        return False
-    print("✅ IDS登录成功")
-    session = auth.session
+    if auth.login():
+        print("[Update] IDS登录成功，尝试请求课表...")
+        from src.api_client import QiangzhiClient
+        client = QiangzhiClient(STUDENT_ID, session=auth.session)
+        html = client.get_schedule_page()
+        if html:
+            courses = client.parse_schedule_html(html)
+            if courses:
+                print(f"✅ requests方式解析到 {len(courses)} 门课程")
 
-    # 获取课表
-    from src.api_client import QiangzhiClient
-    client = QiangzhiClient(STUDENT_ID, session=session)
-    html = client.get_schedule_page()
-
-    if not html or len(html) < 1000:
-        print("❌ 课表HTML为空")
-        return False
-
-    # 解析课表
-    courses = client.parse_schedule_html(html)
+    # 尝试2: 浏览器兜底（当requests方式失败时）
     if not courses:
-        print("⚠️ 未解析到课程数据（可能页面结构不同）")
-        return False
+        print("[Update] requests方式未获取到课表，启动浏览器兜底...")
+        from src.portal_browser import get_schedule_via_portal
+        html = get_schedule_via_portal(STUDENT_ID, PASSWORD)
+        if html:
+            from src.api_client import QiangzhiClient
+            client = QiangzhiClient(STUDENT_ID)
+            courses = client.parse_schedule_html(html)
+            if courses:
+                print(f"✅ 浏览器方式解析到 {len(courses)} 门课程")
 
-    print(f"✅ 解析到 {len(courses)} 门课程")
+    if not courses:
+        print("❌ 课表抓取全部失败（requests + 浏览器）")
+        return False
 
     # 保存到 webapp 和 docs
     for rel_path in ["webapp/data/schedule.json", "docs/data/schedule.json"]:
@@ -107,12 +114,15 @@ def git_push():
     os.chdir(project_dir)
 
     # add
-    subprocess.run(["git", "add", "-A"], capture_output=True)
+    subprocess.run(
+        ["git", "add", "-A"],
+        capture_output=True, encoding="utf-8", errors="replace"
+    )
 
     # 检查是否有变更
     diff = subprocess.run(
         ["git", "diff", "--cached", "--quiet"],
-        capture_output=True
+        capture_output=True, encoding="utf-8", errors="replace"
     )
     if diff.returncode == 0:
         print("ℹ️ 没有数据变更，无需推送")
@@ -122,20 +132,22 @@ def git_push():
     now = time.strftime("%Y-%m-%d %H:%M")
     result = subprocess.run(
         ["git", "commit", "-m", f"update: {now} 自动更新课表和考试"],
-        capture_output=True, text=True
+        capture_output=True, text=True, encoding="utf-8", errors="replace"
     )
     if result.returncode != 0:
-        print(f"❌ Git commit 失败: {result.stderr.strip()}")
+        err = result.stderr.strip() if result.stderr else "未知错误"
+        print(f"❌ Git commit 失败: {err}")
         return False
     print(f"✅ Git commit: {now}")
 
     # push
     result = subprocess.run(
         ["git", "push", "origin", "main"],
-        capture_output=True, text=True
+        capture_output=True, text=True, encoding="utf-8", errors="replace"
     )
     if result.returncode != 0:
-        print(f"❌ Git push 失败: {result.stderr.strip()}")
+        err = result.stderr.strip() if result.stderr else "未知错误"
+        print(f"❌ Git push 失败: {err}")
         return False
 
     print("✅ 推送成功！")
