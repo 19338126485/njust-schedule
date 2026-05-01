@@ -24,9 +24,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 1b. 加载考试数据（优先localStorage，其次exams.json）
   let exams = Storage.loadExams();
-  if (!exams) {
+  if (!exams || !exams.length) {
+    // localStorage 没有或为空，重新从服务器拉取
     try {
-      const res = await fetch('data/exams.json');
+      const res = await fetch('data/exams.json?v=' + Date.now());
       if (res.ok) {
         exams = await res.json();
         Storage.saveExams(exams);
@@ -166,4 +167,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   aboutModalOverlay.addEventListener('click', (e) => {
     if (e.target === aboutModalOverlay) aboutModalOverlay.hidden = true;
   });
+
+  // 刷新数据（清除localStorage缓存，重新fetch）
+  const btnRefresh = document.getElementById('btn-refresh');
+  if (btnRefresh) {
+    btnRefresh.addEventListener('click', async () => {
+      closeMenu();
+      if (!confirm('清除本地缓存并重新拉取最新数据？')) return;
+      Storage.clearExams();
+      try {
+        const res = await fetch('data/exams.json?v=' + Date.now());
+        if (res.ok) {
+          const exams = await res.json();
+          Storage.saveExams(exams);
+          alert('考试数据已更新！\n共 ' + exams.length + ' 场考试');
+        }
+      } catch (e) {
+        alert('拉取失败: ' + e.message);
+      }
+    });
+  }
 });

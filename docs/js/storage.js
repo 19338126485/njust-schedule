@@ -92,5 +92,9 @@
       return false;
     }
   }
-  window.Storage = { loadCourses, saveCourses, getStartDate, setStartDate, exportToFile, importFromFile, loadExams, saveExams };
+  // 清除考试数据（用于刷新）
+  function clearExams() {
+    localStorage.removeItem('njust_exams_data');
+  }
+  window.Storage = { loadCourses, saveCourses, getStartDate, setStartDate, exportToFile, importFromFile, loadExams, saveExams, clearExams };
 })();
