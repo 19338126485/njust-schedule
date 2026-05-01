@@ -133,6 +133,49 @@ class QiangzhiClient:
             print(f"[API] 保存失败: {e}")
             return False
 
+    def _extract_weeks_from_week_view(self, soup) -> Dict[str, str]:
+        """
+        从周视图表格提取课程名称到周次的映射。
+
+        强智系统的课表页面同时包含周视图和列表视图。
+        列表视图有课程名称/教师/时间/地点，但没有周次列。
+        周次信息只在周视图的每个课程格子的 title 属性中：
+            <font title="周次(16)">  或  <font title="周次(1-16)">
+
+        同一门课可能出现在多个格子（不同时间段），周次通常相同。
+        """
+        import re
+        week_map: Dict[str, str] = {}
+
+        # 匹配 kbcontent / kbcontent1 / kbcontentN
+        for div in soup.find_all("div", class_=re.compile(r"^kbcontent")):
+            text = div.get_text(separator="\n", strip=True)
+            lines = [l.strip() for l in text.split("\n") if l.strip()]
+            if not lines:
+                continue
+
+            course_name = lines[0]
+            if not course_name or len(course_name) < 2:
+                continue
+
+            # 从 div 内带 "周次" title 的标签的文本内容提取周次
+            # HTML 结构: <font title="周次(节次)">16(周)</font>
+            # 数字在标签文本中，不在 title 属性里
+            week_match = None
+            for tag in div.find_all(["font", "span", "div", "a"]):
+                title = tag.get("title", "")
+                if "周次" in title:
+                    text = tag.get_text(strip=True)
+                    m = re.search(r"^([\d\-,]+)", text)
+                    if m:
+                        week_match = m.group(1)
+                        break
+
+            if week_match and course_name not in week_map:
+                week_map[course_name] = week_match
+
+        return week_map
+
     def parse_schedule_html(self, html: str) -> List[Dict[str, Any]]:
         """
         解析课表HTML为结构化数据
@@ -150,6 +193,12 @@ class QiangzhiClient:
         soup = BeautifulSoup(html, "html.parser")
         courses = []
 
+        # ===== 第一步：从周视图提取周次映射 =====
+        week_map = self._extract_weeks_from_week_view(soup)
+        if week_map:
+            print(f"[API] 从周视图提取到 {len(week_map)} 门课程的周次信息")
+
+        # ===== 第二步：解析列表视图 =====
         # 查找所有表格
         tables = soup.find_all("table")
         if not tables:
@@ -226,8 +275,10 @@ class QiangzhiClient:
             # 解析地点（逗号分隔，与时间段一一对应）
             locations = [loc.strip() for loc in location_str.split(",") if loc.strip()]
 
-            # 默认周数（全学期，后续可从周视图改进）
-            weeks_str = "1-16"
+            # 从周视图映射获取周次，fallback 到 "1-16"
+            weeks_str = week_map.get(course_name, "1-16")
+            if not weeks_str:
+                weeks_str = "1-16"
 
             for i, (weekday_str, start_jie, end_jie) in enumerate(matches):
                 weekday = weekday_map.get(weekday_str, 0)
