@@ -1,0 +1,9 @@
+{
+  "appId": "com.njust.schedule",
+  "appName": "南理工课表",
+  "webDir": "webapp",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}

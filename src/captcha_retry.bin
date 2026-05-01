@@ -1,0 +1,75 @@
+<!DOCTYPE html><html>
+<!-- 移动端 --><!-- PC端 --><span>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><meta property="qc:admins" content="754034015366713545637571540352652"/><meta property="wb:webmaster" content="1ad39047f32b5b6b"/><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/><title>统一身份认证</title>
+</head>
+<!--主要用于iframe内嵌页面--><!--主要用于web普通页面--><script type="text/javascript" src="/authserver/njustSubjecta/static/common/jquery-latest.min.js?v=20250822.180504"></script>
+	<script type="text/javascript" src="/authserver/njustSubjecta/static/js/i18n.zh_CN.js?v=20250822.180504"></script>
+	<script type="text/javascript" src="/authserver/njustSubjecta/static/common/common-header.js?v=20250822.180504"></script>
+	<!--[if IE 6]>
+        <script type="text/javascript" src="/authserver/njustSubjecta/static/js/png.js?v=20250822.180504"></script>
+    <![endif]--><link rel="stylesheet" type="text/css" href="/authserver/njustSubjecta/static/custom/css/custom.css?v=20250822.180504"/><link rel="stylesheet" type="text/css" href="/authserver/njustSubjecta/static/custom/css/custom-base.css?v=20250822.180504"/><script type="text/javascript">
+	    var contextPath = "/authserver";
+	</script>
+	<body id="bg" style="width: auto">
+		<div class="ui_container_fluid">
+		    <div class="header">
+		        <div class="top">
+		            <div class="logo pull_left">
+		                <img id="logo" class="top-logo-img-maxHeightWidth" alt="IDS logo" title="IDS logo"/></div>
+		        </div>
+		    </div>
+		</div>
+
+</span>
+    <div class="tab-content warn-content">
+        <div class="ibox-content">
+            <div id="welcome" class="warn">
+                <h4>哎呦，出错啦</h4>
+                <p>请求不合法，请联系管理员！</p>
+            </div>
+            <div class="welcome-button">
+                <p id="back" style="text-align: center">
+                    <a id="backBtn" href="javascript:history.back();" class="btn btn-primary">返回</a>
+                    <a id="logoutBtn" href="javascript:void(0);" onclick="logoutBtn()" style="display: none;" class="btn logout-btn-primary">请重新登录</a>
+                </p>
+            </div>
+        </div>
+    </div>
+    <!--尾：移动端访问页面--><!--尾：iframe嵌入页面类型--><!--尾：普通的web访问类型--><div class="clearfloat"></div>
+	<div class="auth_login_footer">
+	    <span>
+    <span id="copyright">版权信息©2015 南京理工大学 苏ICP备11035779号 邮编: 210094</span>
+</span>
+	</div>
+	</body>
+<script type="text/javascript">
+var app_service = "";
+var serverPrefix = "https://ids.njust.edu.cn/authserver";
+var isLogin = "";
+var isMobile = "false";
+$(function(){
+	var hislen=2;
+	if ((navigator.userAgent.indexOf('MSIE') >= 0) && (navigator.userAgent.indexOf('Opera') < 0)){ // IE
+		hislen=1;
+	}
+	if(history.length < hislen){
+		document.getElementById("back").style.display="none";
+	}
+	
+	if(isLogin == "true"){
+        //$("#backBtn").on("click",logoutBtn());
+        //$("#backBtn").removeAttr("href");
+        $("#logoutBtn").show();
+	}
+});
+
+function logoutBtn(){
+    if (app_service) {
+        window.location.href = serverPrefix+"/logout?service="+encodeURIComponent(app_service);
+    }else{
+        window.location.href = serverPrefix+"/logout?service="+encodeURIComponent(serverPrefix+"/login");
+    }
+}
+</script>
+</html>
