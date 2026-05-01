@@ -33,12 +33,13 @@ def update_schedule():
     print("=" * 60)
 
     # IDS登录
-    from src.ids_auth import login_ids
-    session = login_ids(STUDENT_ID, PASSWORD)
-    if not session:
+    from src.ids_auth import NJUSTIDSAuth
+    auth = NJUSTIDSAuth(STUDENT_ID, PASSWORD)
+    if not auth.login():
         print("❌ IDS登录失败")
         return False
     print("✅ IDS登录成功")
+    session = auth.session
 
     # 获取课表
     from src.api_client import QiangzhiClient
