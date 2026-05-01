@@ -71,6 +71,26 @@
     });
   }
 
-  // 暴露
-  window.Storage = { loadCourses, saveCourses, getStartDate, setStartDate, exportToFile, importFromFile };
+  // 加载考试数据
+  function loadExams() {
+    try {
+      const raw = localStorage.getItem('njust_exams_data');
+      if (raw) return JSON.parse(raw);
+    } catch (e) {
+      console.error('Exams load error:', e);
+    }
+    return null;
+  }
+
+  // 保存考试数据
+  function saveExams(exams) {
+    try {
+      localStorage.setItem('njust_exams_data', JSON.stringify(exams));
+      return true;
+    } catch (e) {
+      console.error('Exams save error:', e);
+      return false;
+    }
+  }
+  window.Storage = { loadCourses, saveCourses, getStartDate, setStartDate, exportToFile, importFromFile, loadExams, saveExams };
 })();

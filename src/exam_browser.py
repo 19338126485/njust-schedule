@@ -247,7 +247,11 @@ def get_exams_via_portal(student_id: str, password: str) -> Optional[str]:
             print("[Exam] 页面似乎不含考试数据，保存供分析")
 
         # 保存HTML到文件
-        save_path = os.path.expanduser("~/Desktop/njust_exams_page.html")
+        # 跨平台获取桌面路径
+        desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+        if not os.path.exists(desktop_path):
+            desktop_path = os.path.join(os.path.expanduser("~"), "桌面")
+        save_path = os.path.join(desktop_path, "njust_exams_page.html")
         with open(save_path, "w", encoding="utf-8") as f:
             f.write(html)
         print(f"[Exam] HTML已保存: {save_path} ({len(html)} bytes)")

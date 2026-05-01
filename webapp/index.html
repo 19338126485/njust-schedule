@@ -43,6 +43,7 @@
 <div class="menu-overlay" id="menu-overlay" hidden>
   <div class="menu-panel" id="menu-panel">
     <h3>菜单</h3>
+    <button class="menu-item" id="btn-exams">📋 考试安排</button>
     <button class="menu-item" id="btn-import">
       <span class="menu-icon">📥</span> 导入课表
       <input type="file" id="file-import" accept=".json" hidden>
@@ -62,6 +63,17 @@
     <input type="date" id="date-input" class="date-input">
     <button id="btn-date-save" class="btn-primary">保存</button>
     <button id="btn-date-cancel" class="btn-secondary">取消</button>
+  </div>
+</div>
+
+<!-- 考试安排弹窗 -->
+<div class="modal-overlay" id="exams-modal-overlay" hidden>
+  <div class="modal-card">
+    <h2>📋 考试安排</h2>
+    <div id="exams-content">
+      <p class="empty-state">暂无考试数据</p>
+    </div>
+    <button id="btn-exams-close" class="btn-primary">关闭</button>
   </div>
 </div>
 
