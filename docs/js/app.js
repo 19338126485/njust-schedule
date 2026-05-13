@@ -86,6 +86,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-menu-close').addEventListener('click', closeMenu);
   menuOverlay.addEventListener('click', (e) => { if (e.target === menuOverlay) closeMenu(); });
 
+  // 判断考试是否已考完
+  function isExamFinished(exam) {
+    const now = new Date();
+    if (exam.date) {
+      const endTime = exam.end_time || '23:59';
+      const examEnd = new Date(`${exam.date}T${endTime}`);
+      return now > examEnd;
+    }
+    if (exam.exam_time) {
+      const match = exam.exam_time.match(/(\d{4}-\d{2}-\d{2})/);
+      if (match) {
+        const date = match[1];
+        const timeMatch = exam.exam_time.match(/~(\d{2}:\d{2})/);
+        const endTime = timeMatch ? timeMatch[1] : '23:59';
+        const examEnd = new Date(`${date}T${endTime}`);
+        return now > examEnd;
+      }
+    }
+    return false;
+  }
+
   // 考试安排
   function renderExams() {
     const examData = Storage.loadExams() || [];
@@ -97,7 +118,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     html += '<tr><th>课程</th><th>时间</th><th>考场</th><th>座位</th></tr>';
     for (const e of examData) {
       const time = e.date ? `${e.date} ${e.start_time || ''}~${e.end_time || ''}` : (e.exam_time || '');
-      html += `<tr><td>${e.course_name || ''}</td><td>${time}</td><td>${e.room || ''}</td><td>${e.seat || ''}</td></tr>`;
+      const finished = isExamFinished(e);
+      const rowClass = finished ? 'exam-finished' : '';
+      html += `<tr class="${rowClass}"><td>${e.course_name || ''}</td><td>${time}</td><td>${e.room || ''}</td><td>${e.seat || ''}</td></tr>`;
     }
     html += '</table>';
     examsContent.innerHTML = html;

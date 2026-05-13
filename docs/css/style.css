@@ -370,6 +370,11 @@ body {
 .exam-table tr:last-child td {
   border-bottom: none;
 }
+.exam-finished td {
+  text-decoration: line-through;
+  opacity: 0.6;
+  color: #aaa;
+}
 .exam-table tr:active {
   background: #f8f9fa;
 }
