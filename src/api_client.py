@@ -10,7 +10,7 @@
 import requests
 import json
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 
 
 class QiangzhiClient:
@@ -133,46 +133,64 @@ class QiangzhiClient:
             print(f"[API] 保存失败: {e}")
             return False
 
-    def _extract_weeks_from_week_view(self, soup) -> Dict[str, str]:
+    def _extract_weeks_from_week_view(self, soup) -> Dict[Tuple[str, int], List[str]]:
         """
-        从周视图表格提取课程名称到周次的映射。
+        从周视图表格提取 (课程名, 天) -> [周次列表] 映射。
 
-        强智系统的课表页面同时包含周视图和列表视图。
-        列表视图有课程名称/教师/时间/地点，但没有周次列。
-        周次信息只在周视图的每个课程格子的 title 属性中：
-            <font title="周次(16)">  或  <font title="周次(1-16)">
-
-        同一门课可能出现在多个格子（不同时间段），周次通常相同。
+        强智系统周视图的每个 td 格子可能堆叠多门课程（用 ----- 分隔），
+        同一门课同一天也可能有不同周次的调课版本。
+        此方法遍历每个 td 的隐藏 div，提取所有课程名和周次，
+        按 (course_name, day) 分组返回周次列表，供列表视图按顺序分配。
         """
         import re
-        week_map: Dict[str, str] = {}
+        week_map: Dict[Tuple[str, int], List[str]] = {}
 
-        # 匹配 kbcontent / kbcontent1 / kbcontentN
-        for div in soup.find_all("div", class_=re.compile(r"^kbcontent")):
-            text = div.get_text(separator="\n", strip=True)
-            lines = [l.strip() for l in text.split("\n") if l.strip()]
-            if not lines:
+        for table in soup.find_all("table"):
+            header_row = table.find("tr")
+            if not header_row:
+                continue
+            header = [th.get_text(strip=True) for th in header_row.find_all(["th", "td"])]
+            if not any(day in header for day in ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]):
                 continue
 
-            course_name = lines[0]
-            if not course_name or len(course_name) < 2:
-                continue
+            rows = table.find_all("tr")[1:]  # 跳过表头
+            for row_idx, row in enumerate(rows, start=1):
+                tds = row.find_all(["td", "th"])
+                for col_idx, td in enumerate(tds):
+                    if col_idx == 0 or col_idx > 7:
+                        continue
+                    day = col_idx  # 1=周一, 2=周二, ...
 
-            # 从 div 内带 "周次" title 的标签的文本内容提取周次
-            # HTML 结构: <font title="周次(节次)">16(周)</font>
-            # 数字在标签文本中，不在 title 属性里
-            week_match = None
-            for tag in div.find_all(["font", "span", "div", "a"]):
-                title = tag.get("title", "")
-                if "周次" in title:
-                    text = tag.get_text(strip=True)
-                    m = re.search(r"^([\d\-,]+)", text)
-                    if m:
-                        week_match = m.group(1)
-                        break
+                    # 优先从隐藏的 kbcontent div 提取（信息完整，无重复）
+                    hidden = td.find("div", class_="kbcontent", style=re.compile(r"display:\s*none"))
+                    if not hidden:
+                        continue
 
-            if week_match and course_name not in week_map:
-                week_map[course_name] = week_match
+                    text = hidden.get_text(separator="|", strip=True)
+                    # 同一 td 中多门课用 5 个以上 - 分隔
+                    parts = [p.strip() for p in re.split(r'-{5,}', text) if p.strip()]
+
+                    for part in parts:
+                        lines = [l.strip() for l in part.split("|") if l.strip()]
+                        if len(lines) < 2:
+                            continue
+
+                        course_name = lines[0]
+                        # 提取周次：形如 "1-8,10-12(周)" 或 "13(周)"
+                        week = None
+                        for line in lines[1:]:
+                            m = re.search(r'^([\d\-,]+)\(周\)', line)
+                            if m:
+                                week = m.group(1)
+                                break
+
+                        if week and course_name:
+                            key = (course_name, day)
+                            if key not in week_map:
+                                week_map[key] = []
+                            if week not in week_map[key]:
+                                week_map[key].append(week)
+            break
 
         return week_map
 
@@ -196,7 +214,7 @@ class QiangzhiClient:
         # ===== 第一步：从周视图提取周次映射 =====
         week_map = self._extract_weeks_from_week_view(soup)
         if week_map:
-            print(f"[API] 从周视图提取到 {len(week_map)} 门课程的周次信息")
+            print(f"[API] 从周视图提取到 {len(week_map)} 个 (课程,天) 组合的周次信息")
 
         # ===== 第二步：解析列表视图 =====
         # 查找所有表格
@@ -275,10 +293,8 @@ class QiangzhiClient:
             # 解析地点（逗号分隔，与时间段一一对应）
             locations = [loc.strip() for loc in location_str.split(",") if loc.strip()]
 
-            # 从周视图映射获取周次，fallback 到 "1-16"
-            weeks_str = week_map.get(course_name, "1-16")
-            if not weeks_str:
-                weeks_str = "1-16"
+            # 初始化周次分配器：按 (course_name, day) 顺序分配周次列表
+            week_assignment = {}
 
             for i, (weekday_str, start_jie, end_jie) in enumerate(matches):
                 weekday = weekday_map.get(weekday_str, 0)
@@ -287,6 +303,22 @@ class QiangzhiClient:
 
                 start_jie_num = int(start_jie)
                 end_jie_num = int(end_jie)
+
+                # 从周视图获取该课程该天的周次列表，按顺序分配
+                weeks_list = week_map.get((course_name, weekday), [])
+                idx_key = (course_name, weekday)
+                if idx_key not in week_assignment:
+                    week_assignment[idx_key] = 0
+                idx = week_assignment[idx_key]
+
+                if idx < len(weeks_list):
+                    weeks_str = weeks_list[idx]
+                else:
+                    # fallback：优先用该课程第一天的第一个周次，否则默认 1-16
+                    fallback = weeks_list[0] if weeks_list else "1-16"
+                    weeks_str = fallback
+
+                week_assignment[idx_key] = idx + 1
 
                 # 构建kcsj编码: 星期 + 节次（每两位一组）
                 kcsj = str(weekday)
