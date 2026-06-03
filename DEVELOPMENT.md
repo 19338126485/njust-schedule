@@ -1,13 +1,12 @@
 # 开发说明 — 南理工课表项目
 
-> 本文档供日后继续开发时参考。记录当前架构、已知问题、未来改进方向。
+> 本文档供继续开发时参考。记录当前架构、已知问题、未来改进方向。
 
 ---
 
 ## 当前版本
 
-- **稳定版 tag**: `v2.0-stable`
-- **备份 branch**: `backup/v2.0-stable`
+- **稳定版 tag**: `v2.1-clean-requests`
 - **GitHub Pages**: https://19338126485.github.io/njust-schedule/
 
 ---
@@ -16,7 +15,7 @@
 
 | 模块 | 说明 |
 |------|------|
-| 课表抓取 | IDS统一认证 → 强智教务系统 → 解析HTML → `schedule.json` |
+| 课表抓取 | 浏览器自动化：门户 → 教务系统 → 课表 → 解析HTML → `schedule.json` |
 | 考试抓取 | 浏览器自动化：门户 → 教务系统 → 考试报名 → 查询 → `exams.json` |
 | ICS导出 | 将课表导出为 `.ics` 日历文件，支持手机/电脑日历导入 |
 | PWA手机端 | 离线可用，周视图/日视图，课程弹窗详情 |
@@ -48,11 +47,10 @@
 | 文件 | 职责 |
 |------|------|
 | `update.bat` / `update.py` | 一键更新入口。自动抓取课表+考试，git push |
-| `src/ids_auth.py` | IDS统一认证。AES加密密码，获取CAS Cookie |
-| `src/portal_browser.py` | 浏览器自动化（DrissionPage）。门户→教务系统→课表/考试 |
-| `src/exam_browser.py` | 考试查询浏览器流程。复用 `portal_browser.py` 的 `find_and_click` |
+| `src/portal_browser.py` | 浏览器自动化（DrissionPage）。门户→教务系统→课表 |
+| `src/exam_browser.py` | 考试查询浏览器流程。复用 portal_browser 的部分逻辑 |
 | `src/exam_parser.py` | 考试HTML解析。解析 `<table id="dataList">` |
-| `src/api_client.py` | 强智系统HTTP客户端 + 课表HTML解析。输出前端友好JSON |
+| `src/api_client.py` | 强智系统课表HTML解析器。输出前端友好JSON |
 | `src/ics_exporter.py` | ICS日历导出。支持单双周、课前提醒 |
 | `webapp/js/schedule.js` | 课表渲染引擎。Grid布局，周/日视图切换 |
 | `webapp/js/app.js` | PWA主逻辑。数据加载、弹窗、刷新按钮 |
@@ -63,14 +61,12 @@
 
 ## 关键决策记录
 
-### 1. 登录策略：IDS SSO + 浏览器兜底
+### 1. 登录策略：只保留浏览器自动化
 
-南理工教务系统强制通过 `ids.njust.edu.cn` 金智IDS统一认证登录。纯 `requests` 能登录IDS，但无法完成CAS ticket交换到强智教务系统。
+南理工教务系统强制通过 `ids.njust.edu.cn` 金智IDS统一认证登录。
 
-**方案**：
-1. 先用 `requests` IDS模拟登录（快速、无头）
-2. 如果课表请求返回登录页 → 自动启动浏览器兜底
-3. 浏览器走完整SSO链路：IDS登录 → 302跳转 → 强智系统
+**历史**：曾尝试 requests 模拟登录（AES加密）和浏览器 Cookie 获取两种备用方案，但均已证明走不通。
+**当前方案**：唯一可靠路径是浏览器自动化——启动 Edge → 访问门户 → 自动填入账号密码 → 点击教务系统 → 标签页切换 → 操作强智系统。
 
 ### 2. 课表解析：从周视图提取周次
 
@@ -84,7 +80,7 @@
 
 `sw.js` 使用网络优先策略（fetch成功就用最新，失败才fallback缓存）。开发阶段避免缓存旧版本。
 
-生产使用时注意：如果用户长期离线，看到的仍是上次缓存的数据。
+**注意**：当前存在缓存匹配问题。`sw.js` 预缓存 `data/schedule.json`（无查询参数），但 `app.js` 实际请求 `data/schedule.json?v=...`（带时间戳）。Service Worker 的 `caches.match()` 精确匹配 URL（包括查询参数），导致离线时缓存 miss。待修复。
 
 ### 4. 数据格式：前端友好JSON
 
@@ -119,11 +115,14 @@ PWA渲染引擎用 `name/day/startJie/endJie/weeks/color`，ICS导出器用 `kss
 
 | 问题 | 影响 | 状态 |
 |------|------|------|
-| 手机端需手动点击「刷新数据」 | 不自动同步最新课表 | ✅ 有workaround（刷新按钮） |
-| 课程时间重叠冲突显示 | 两个课在同一小节时可能重叠覆盖 | ❌ 未修复 |
+| `portal_browser.py` 和 `exam_browser.py` 代码大量重复 | 维护成本高，改版要改两处 | 🔴 待重构 |
+| `schedule.js` 硬编码开学日期 | 用户设置日期后周次仍错 | 🔴 待修复 |
+| `storage.js` 默认日期与配置不一致 | 前后端周次计算不一致 | 🔴 待修复 |
+| Service Worker 缓存匹配缺陷 | 离线时数据文件可能加载失败 | 🔴 待修复 |
+| 课程时间重叠冲突显示 | 两个课在同一小节时可能重叠覆盖 | 🟡 待修复 |
 | 课表抓取依赖浏览器自动化 | 必须在Windows电脑+Edge上运行 | 架构限制 |
 | 验证码场景需手动输入 | IDS偶尔触发验证码，脚本暂停等待 | 低概率 |
-| 长期离线可能看到旧数据 | SW缓存过期策略未配置 | 待改进 |
+| `exam_parser.py` 硬编码中文表头 | 教务系统改字就解析失败 | 🟡 待改进 |
 
 ### 浏览器兼容性
 
@@ -136,12 +135,14 @@ PWA渲染引擎用 `name/day/startJie/endJie/weeks/color`，ICS导出器用 `kss
 
 ## 未来改进方向
 
-### 高优先级（用户明确提过）
+### 高优先级
 
 | 功能 | 技术方案 | 复杂度 |
 |------|----------|--------|
+| **提取浏览器公共基类** | 将 portal_browser + exam_browser 的公共部分提取为 `browser/base.py` 和 `browser/portal_flow.py` | 中 |
 | **课程时间重叠冲突显示** | Grid布局中同一格子多个课程时，用flex column堆叠或交替显示 | 中 |
-| **课前提醒（Notification API）** | Service Worker + `self.registration.showNotification()`，定时检查下一节课 | 中 |
+| **修复前端日期不一致** | `schedule.js` 读取 `Storage.getStartDate()` 替代硬编码 | 低 |
+| **修复SW缓存匹配** | 对 `data/*.json` 请求做查询参数剥离 | 低 |
 
 ### 中优先级
 
@@ -212,7 +213,6 @@ python -m src.exams_main
 |------|------|------|
 | DrissionPage | 4.1.1.2 | 浏览器自动化 |
 | beautifulsoup4 | >=4.12.0 | HTML解析 |
-| requests | - | IDS模拟登录 |
 | icalendar | - | ICS日历导出 |
 
 ### DrissionPage 4.x API差异
@@ -243,5 +243,5 @@ page.to_tab(index)         # 切换到指定索引的标签页
 
 ---
 
-*最后更新: 2026-05-01*
-*对应版本: v2.0-stable*
+*最后更新: 2026-06-03*  
+*对应版本: v2.1-clean-requests*

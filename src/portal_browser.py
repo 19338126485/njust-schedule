@@ -92,11 +92,23 @@ def _get_tab_by_url(browser_page, url_substrings):
     return None
 
 
-def get_schedule_via_portal(student_id: str, password: str) -> Optional[str]:
-    """通过智慧理工门户获取课表HTML"""
+def enter_qiangzhi_system(student_id: str, password: str, prefix: str = "[Portal]"):
+    """
+    通过智慧理工门户进入强智教务系统。
+
+    流程: 启动浏览器 → 访问门户 → IDS登录 → 点击教务系统 → 切换到强智标签页
+
+    Args:
+        student_id: 学号
+        password: 密码
+        prefix: 日志前缀，如 "[Portal]" 或 "[Exam]"
+
+    Returns:
+        (browser_page, active_page) 元组，失败返回 (None, None)
+    """
     ChromiumPage = _safe_import_drission()
     if not ChromiumPage:
-        return None
+        return None, None
 
     try:
         from DrissionPage import ChromiumOptions
@@ -111,28 +123,26 @@ def get_schedule_via_portal(student_id: str, password: str) -> Optional[str]:
             if os.path.exists(path):
                 co = ChromiumOptions()
                 co.set_browser_path(path)
-                print(f"[Portal] 找到Edge浏览器: {path}")
+                print(f"{prefix} 找到Edge浏览器: {path}")
                 break
 
         if co is None:
             co = ChromiumOptions()
 
-        # browser_page 是浏览器实例，管理所有标签页
         browser_page = ChromiumPage(addr_or_opts=co)
-        # active_page 是当前操作的标签页对象
         active_page = browser_page
 
-        # ===== Step 1: 访问门户 =====
-        print("[Portal] 正在访问智慧理工门户...")
+        # Step 1: 访问门户
+        print(f"{prefix} 正在访问智慧理工门户...")
         active_page.get(PORTAL_URL)
         time.sleep(3)
 
         current_url = active_page.url
-        print(f"[Portal] 当前URL: {current_url}")
+        print(f"{prefix} 当前URL: {current_url}")
 
-        # ===== Step 2: IDS登录 =====
+        # Step 2: IDS登录
         if "authserver/login" in current_url:
-            print("[Portal] 需要IDS登录，正在填入账号密码...")
+            print(f"{prefix} 需要IDS登录，正在填入账号密码...")
 
             username = (
                 active_page.ele("#username", timeout=3)
@@ -146,12 +156,12 @@ def get_schedule_via_portal(student_id: str, password: str) -> Optional[str]:
             )
 
             if not username or not pwd:
-                print("[Portal] 无法定位IDS登录框")
-                input("[Portal] 请手动完成IDS登录，按回车继续: ")
+                print(f"{prefix} 无法定位IDS登录框")
+                input(f"{prefix} 请手动完成IDS登录，按回车继续: ")
             else:
                 username.input(student_id)
                 pwd.input(password)
-                print("[Portal] IDS账号密码已填入")
+                print(f"{prefix} IDS账号密码已填入")
 
                 login_btn = (
                     active_page.ele("#login_submit", timeout=2)
@@ -164,63 +174,76 @@ def get_schedule_via_portal(student_id: str, password: str) -> Optional[str]:
                     login_btn.click()
                     time.sleep(3)
                 else:
-                    input("[Portal] 请手动点击IDS登录，按回车继续: ")
+                    input(f"{prefix} 请手动点击IDS登录，按回车继续: ")
 
-            if "captcha" in active_page.html.lower() or "验证码" in active_page.html:
-                input("[Portal] IDS需要验证码，请在浏览器中完成并按回车: ")
+                if "captcha" in active_page.html.lower() or "验证码" in active_page.html:
+                    input(f"{prefix} IDS需要验证码，请在浏览器中完成并按回车: ")
 
-            ok, url = _poll_url_change(active_page, ["ehall", "portal"], timeout_sec=20)
-            print(f"[Portal] IDS登录后URL: {url}")
+                ok, url = _poll_url_change(active_page, ["ehall", "portal"], timeout_sec=20)
+                print(f"{prefix} IDS登录后URL: {url}")
 
-        # ===== Step 3: 点击"教务系统" =====
-        print("[Portal] 正在查找并点击'教务系统'...")
+        # Step 3: 点击"教务系统"
+        print(f"{prefix} 正在查找并点击'教务系统'...")
         time.sleep(2)
 
         clicked = find_and_click(active_page, ["本科教务", "教务系统", "教务管理"], "主入口")
 
         if not clicked:
-            print("[Portal] 未自动找到教务入口，请手动点击")
-            input("[Portal] 请在浏览器中点击'教务系统'，按回车继续: ")
+            print(f"{prefix} 未自动找到教务入口，请手动点击")
+            input(f"{prefix} 请在浏览器中点击'教务系统'，按回车继续: ")
         else:
-            print("[Portal] 已点击'教务系统'，等待跳转...")
+            print(f"{prefix} 已点击'教务系统'，等待跳转...")
 
-        # ===== Step 4: 等待并切换到强智系统标签页 =====
-        # 方法A: 当前标签页导航
+        # Step 4: 等待并切换到强智系统标签页
         ok, url = _poll_url_change(active_page, ["bkjw.njust.edu.cn"], timeout_sec=15)
         if ok:
-            print(f"[Portal] 当前标签页已导航到强智: {url}")
+            print(f"{prefix} 当前标签页已导航到强智: {url}")
         else:
-            # 方法B: 扫描所有标签页，找到含bkjw的
-            print("[Portal] 当前标签页未导航，扫描所有标签页...")
+            print(f"{prefix} 当前标签页未导航，扫描所有标签页...")
             time.sleep(3)
 
             qz_tab = _get_tab_by_url(browser_page, ["bkjw.njust.edu.cn"])
             if qz_tab:
-                print("[Portal] 发现强智系统标签页，切换操作对象...")
+                print(f"{prefix} 发现强智系统标签页，切换操作对象...")
                 try:
-                    qz_tab.set.activate()  # 激活该标签页（让浏览器显示它）
+                    qz_tab.set.activate()
                     time.sleep(2)
                 except Exception as e:
-                    print(f"[Portal] 激活标签页失败: {e}")
-                # 后续所有操作改用 qz_tab
+                    print(f"{prefix} 激活标签页失败: {e}")
                 active_page = qz_tab
-                print(f"[Portal] 切换后URL: {active_page.url}")
+                print(f"{prefix} 切换后URL: {active_page.url}")
             else:
-                print("[Portal] 未检测到强智系统标签页")
+                print(f"{prefix} 未检测到强智系统标签页")
                 print("    请在浏览器中确保已进入强智系统主页")
                 print("    （URL应包含 bkjw.njust.edu.cn）")
                 input("    完成后按回车继续: ")
 
         # 确认当前在强智系统
         if "bkjw.njust.edu.cn" not in active_page.url:
-            print("[Portal] 似乎不在强智系统，当前URL: " + active_page.url)
+            print(f"{prefix} 似乎不在强智系统，当前URL: " + active_page.url)
             print("    请手动在浏览器中导航到强智系统")
             input("    完成后按回车继续: ")
 
-        print(f"[Portal] 强智系统当前URL: {active_page.url}")
+        print(f"{prefix} 强智系统当前URL: {active_page.url}")
         time.sleep(3)
 
-        # ===== Step 5: 在强智系统主页点击"课表" =====
+        return browser_page, active_page
+
+    except Exception as e:
+        print(f"{prefix} 浏览器自动化异常: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None
+
+
+def get_schedule_via_portal(student_id: str, password: str) -> Optional[str]:
+    """通过智慧理工门户获取课表HTML"""
+    browser_page, active_page = enter_qiangzhi_system(student_id, password, prefix="[Portal]")
+    if not browser_page or not active_page:
+        return None
+
+    try:
+        # Step 5: 在强智系统主页点击"课表"
         print("[Portal] 正在强智系统中查找'课表'入口...")
 
         clicked2 = find_and_click(
@@ -236,7 +259,7 @@ def get_schedule_via_portal(student_id: str, password: str) -> Optional[str]:
         else:
             print("[Portal] 已点击课表入口，等待跳转...")
 
-        # ===== Step 6: 等待导航到课表页 =====
+        # Step 6: 等待导航到课表页
         ok, url = _poll_url_change(active_page, ["xskb"], timeout_sec=20)
         if ok:
             print(f"[Portal] 已到达课表页: {url}")
@@ -296,4 +319,8 @@ def get_schedule_via_portal(student_id: str, password: str) -> Optional[str]:
         print(f"[Portal] 浏览器自动化异常: {e}")
         import traceback
         traceback.print_exc()
+        try:
+            browser_page.quit()
+        except:
+            pass
         return None

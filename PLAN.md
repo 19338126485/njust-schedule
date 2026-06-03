@@ -1,38 +1,98 @@
 # 南京理工大学课表项目 - 开发计划
 
-**截止日期**: 2026/06/30（周三课表停止服务）
-**当前日期**: 2026/05/01
-**剩余时间**: ~60天
+**项目目标**: 替代「周三课表」小程序，长期自用的课表查询工具  
+**当前稳定版本**: `v2.1-clean-requests`  
+**开发状态**: 活跃维护中
 
 ---
 
-## Phase 1: 数据抓取层 ✅（已完成）
+## 已完成的里程碑
 
-### 已完成工作
-- [x] IDS统一身份认证模拟登录（AES加密、验证码处理）
-- [x] Edge浏览器自动化兜底（DrissionPage）
-- [x] 智慧理工门户→强智系统标签页切换（解决新标签页打开问题）
-- [x] 课表HTML获取（`xskb_list.do`）
-- [x] HTML解析器（列表视图提取：课程名称、教师、时间、地点）
-- [x] ICS日历导出（支持单双周、课前提醒）
+### v1.0-pwa — PWA 基础版
+- [x] 课表数据抓取与解析
+- [x] PWA 离线查看（周视图/日视图）
+- [x] ICS 日历导出
+- [x] GitHub Pages 部署
 
-### 技术栈
-- Python 3.x
-- requests + BeautifulSoup4
-- DrissionPage 4.x（Edge浏览器自动化）
-- icalendar（ICS格式）
+### v2.0-stable — 考试+一键更新
+- [x] 考试安排抓取与解析
+- [x] 一键更新脚本 (`update.bat`)
+- [x] 自动推送到 GitHub Pages
+
+### v2.1-clean-requests — 清理 requests 路径
+- [x] 删除 `ids_auth.py`（requests 模拟 IDS 登录，已证明走不通）
+- [x] 删除 `browser_auth.py`（浏览器 Cookie 备用方案，被 portal_browser 覆盖）
+- [x] 删除 `direct_browser.py`（dead code）
+- [x] 删除 `debug_ids.py`（IDS 诊断脚本，不再需要）
+- [x] 简化 `api_client.py`：去掉 session 依赖，删除废弃 app.do 方法
+- [x] 简化 `main.py`：直接走 portal_browser，删除两个 login 函数
+- [x] 简化 `update.py`：直接走浏览器自动化
 
 ---
 
-## Phase 2: 数据修正 🔄（今天完成）
+## 待修复的已知问题
 
-### 待办
-- [x] 修正时间映射（根据南理工江阴校区实际时间表）
-- [ ] 从周视图HTML精确提取周次范围（当前默认1-16周）
-- [ ] 处理"模拟与数字电路综合实验"等实验课程的重复项
-- [ ] 完善课程属性（必修/选修/预置）的解析
+### 🔴 高优先级
 
-### 时间表（已确认）
+| 问题 | 影响 | 文件 |
+|------|------|------|
+| `portal_browser.py` 和 `exam_browser.py` 80%代码重复 | 教务系统改版要改两处 | `src/portal_browser.py`, `src/exam_browser.py` |
+| `schedule.js` 硬编码开学日期 `2026-03-02` | 用户设置开学日期后周次仍错 | `webapp/js/schedule.js` |
+| `storage.js` 默认开学日期 `'2026-02-17'` 与配置不一致 | 前后端周次计算不一致 | `webapp/js/storage.js` |
+| Service Worker 缓存 `data/*.json` 不带查询参数，但 `app.js` 请求带 `?v=...` | 离线时数据文件缓存 miss | `webapp/sw.js` |
+
+### 🟡 中优先级
+
+| 问题 | 影响 | 文件 |
+|------|------|------|
+| 课程时间重叠时 UI 覆盖 | 同一格子多门课只显示一个 | `webapp/css/style.css`, `webapp/js/schedule.js` |
+| `ics_exporter.py` fallback 时间映射与实际课表不符 | ICS 导出时间可能偏差 | `src/ics_exporter.py` |
+| `requirements.txt` 包含 `requests`, `PyExecJS` 等不再需要依赖 | 安装冗余 | `requirements.txt` |
+| `exam_parser.py` 表头硬编码中文 | 教务系统改个字就解析失败 | `src/exam_parser.py` |
+
+### 🟢 低优先级
+
+| 问题 | 影响 |
+|------|------|
+| `exams_main.py` 和 `update.py` 有重复的数据保存逻辑 | 代码冗余 |
+| `update.py` 的 commit message 是固定格式 | 不区分课表/考试/双更新的场景 |
+
+---
+
+## 重构路线图
+
+### Phase 1: 提取浏览器公共基类
+
+**目标**: 合并 `portal_browser.py` 和 `exam_browser.py` 的重复部分
+
+**提取内容**:
+```
+src/browser/
+    base.py          ← _safe_import_drission, _init_browser, _poll_url_change
+    portal_flow.py   ← 门户登录 → IDS登录 → 点击教务系统 → 标签页切换
+    schedule_flow.py ← portal_flow + 点击课表入口
+    exam_flow.py     ← portal_flow + 点击考试报名 + 触发查询
+```
+
+**收益**: 教务系统登录流程改版时，只改一个地方。
+
+### Phase 2: 前端修复
+
+1. `schedule.js` 从 `Storage.getStartDate()` 读取开学日期
+2. `storage.js` 默认日期同步为 `2026-03-02`
+3. `sw.js` 缓存策略修复：对 `data/*.json` 的请求做查询参数剥离，或改用正确的 cache-busting
+4. 课程冲突显示：同一格子多门课时用 flex column 堆叠
+
+### Phase 3: 基础设施清理
+
+1. `requirements.txt` 移除 `requests`, `PyExecJS`
+2. `exam_parser.py` 表头映射改为模糊匹配（兼容"考场"/"考试地点"等变体）
+3. `update.py` commit message 增加变更摘要（课表/考试/双更新）
+
+---
+
+## 排课时间（已确认）
+
 | 大节 | 小节 | 开始 | 结束 |
 |------|------|------|------|
 | 第一大节 | 1~3 | 08:00 | 10:25 |
@@ -44,174 +104,19 @@
 
 ---
 
-## Phase 3: 手机端PWA应用 📱 ✅（已完成）
+## 关键外部依赖
 
-### 方案选择
-**采用PWA（Progressive Web App）**：
-- ✅ 纯前端，无需后端服务器（密码不上传）
-- ✅ 可"添加到主屏幕"，像原生App一样使用
-- ✅ 支持离线查看（Service Worker缓存）
-- ✅ 课表数据存在浏览器localStorage
-- ✅ 开发简单，HTML+CSS+JS即可
-- ✅ 通过GitHub Pages免费部署
-
-### UI设计（参考周三课表小程序）
-
-#### 周视图
-```
-┌────────────────────────────────────────┐
-│ ← 课表查询          ...  ○              │
-├────────────────────────────────────────┤
-│  周一   周二   周三   周四   周五  六 日 │
-│  4/27   28    29     30    5/1   2  3  │
-├────────────────────────────────────────┤
-│ 1│                                     │
-│ 2│         [08:50 体育(IV)]            │
-│ 3│         [江阴运动场东跑道]          │
-├────────────────────────────────────────┤
-│ 4│ [10:40模电]  [10:40工程数学]        │
-│ 5│ [C103]       [C303]                 │
-├────────────────────────────────────────┤
-│ ...                                     │
-├────────────────────────────────────────┤
-│ 星期五  <  △ 第九周  >  [日]  [周]     │
-└────────────────────────────────────────┘
-```
-
-#### 日视图
-- 当天所有课程纵向排列
-- 时间轴+课程卡片
-
-#### 底部导航栏
-- 左/右箭头：切换上一周/下一周
-- "第X周"：周次显示
-- "日"/"周"按钮：视图切换
-- 当前日期标签（如"星期五"）
-
-### 功能清单
-
-#### 核心功能
-- [x] 周视图渲染（1-14小节 × 7天）
-- [x] 日视图渲染
-- [x] 课程卡片显示（时间、地点、名称、教师）
-- [x] 不同课程用不同颜色区分（10种颜色）
-- [x] 周次切换（上一周/下一周）
-- [x] 当前周高亮标记
-- [x] 今日日期高亮
-
-#### 数据管理
-- [x] 从JSON加载课表数据
-- [x] localStorage持久化存储
-- [x] 课表数据导出/导入（JSON文件）
-- [x] 开学日期设置（计算周次）
-- [x] 单双周正确显示
-
-#### PWA配置
-- [x] manifest.json（应用名称、图标、主题色）
-- [x] Service Worker（离线缓存）
-- [x] 添加到主屏幕提示
-- [x] 响应式设计（适配各种手机屏幕）
-
-#### 额外功能
-- [x] 课程详情弹窗（点击卡片查看完整信息）
-- [ ] 课前提醒（可选，用Notification API）
-- [ ] 空教室查询（如果强智系统支持）
-- [ ] 课程冲突检测
-
-### 技术栈
-- HTML5 + CSS3（Flexbox/Grid布局）
-- Vanilla JavaScript（无需框架，减少依赖）
-- PWA API（Service Worker、Manifest）
-- GitHub Pages（免费托管）
-
-### 文件结构
-```
-webapp/
-├── index.html          # 主页面
-├── css/
-│   └── style.css       # 样式
-├── js/
-│   ├── app.js          # 主逻辑
-│   ├── schedule.js     # 课表渲染
-│   ├── storage.js      # localStorage管理
-│   └── pwa.js          # Service Worker注册
-├── data/
-│   └── schedule.json   # 课表数据（由Python脚本生成）
-├── manifest.json       # PWA配置
-├── sw.js              # Service Worker
-└── icons/             # 应用图标
-```
+| 依赖 | 版本 | 用途 |
+|------|------|------|
+| DrissionPage | 4.1.1.2 | 浏览器自动化 |
+| beautifulsoup4 | >=4.12.0 | HTML解析 |
+| icalendar | - | ICS日历导出 |
 
 ---
 
-## Phase 4: 整合层 🔗（PWA完成后）
+## 重要URL
 
-### 待办
-- [ ] Python脚本导出JSON → PWA直接读取
-- [ ] 一键生成完整可部署的webapp文件夹
-- [ ] 自动同步：更新课表后重新生成JSON，刷新PWA即可
-
-### 使用流程（最终版）
-1. 电脑上运行 `python src/main.py` → 抓取课表 → 导出 `schedule.json`
-2. 将 `schedule.json` 放到 `webapp/data/` 目录
-3. GitHub Pages自动部署（或手动复制到手机）
-4. 手机上访问网页 → "添加到主屏幕"
-5. 打开App查看课表（支持离线）
-
----
-
-## Phase 5: 优化与备用方案（时间允许）
-
-### 可选优化
-- [ ] 微信小程序版本（如果需要分享给同学）
-- [ ] 课表桌面小组件（Android Widget）
-- [ ] 自动定时更新课表（cron任务）
-- [ ] 课程评价/笔记功能
-- [ ] 考试/作业提醒集成
-
-### 备用方案
-如果PWA在红米手机上体验不佳：
-- **方案B**: 微信小程序（需要注册、开发工具）
-- **方案C**: 纯静态HTML文件，每次更新后发给手机
-- **方案D**: 用Termux在安卓上直接运行Python脚本
-
----
-
-## 里程碑
-
-| 日期 | 里程碑 |
-|------|--------|
-| 2026/05/01 | ✅ 课表数据抓取完成，ICS导出可用 |
-| 2026/05/02 | 🎯 PWA项目初始化，UI框架搭建 |
-| 2026/05/03 | 🎯 周视图/日视图渲染完成 |
-| 2026/05/04 | 🎯 数据加载、localStorage、颜色区分 |
-| 2026/05/05 | 🎯 PWA配置完成，可添加到主屏幕 |
-| 2026/05/06 | 🎯 整合测试，手机上验证 |
-| 2026/06/30 | ⏰ 周三课表停止服务 |
-
----
-
-## 关键信息备忘
-
-### 南理工系统
-- **IDS登录**: `https://ids.njust.edu.cn/authserver/login`
-- **课表URL**: `http://bkjw.njust.edu.cn/njlgdx/xskb/xskb_list.do?Ves632DSdyV=NEW_XSD_PYGL`
 - **门户**: `https://ehall2.njust.edu.cn/index.html#/`
+- **课表URL**: `http://bkjw.njust.edu.cn/njlgdx/xskb/xskb_list.do?Ves632DSdyV=NEW_XSD_PYGL`
 - **强智主页**: `http://bkjw.njust.edu.cn/njlgdx/framework/main.jsp`
-
-### 排课时间
-- 一天13小节 + 1网课占位符
-- 每小节45分钟，小节间5分钟，大节间15分钟
-- 具体时间表见Phase 2
-
-### 学号
-- `JY924128980223`
-
-### 开发环境
-- Windows 11 + PowerShell
-- Edge浏览器（`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`）
-- Python 3.x
-- DrissionPage 4.1.1.2
-
-### 项目目录
-`C:\Users\19338\Desktop\学习相关\南京理工大学个人课表项目`
+- **GitHub Pages**: https://19338126485.github.io/njust-schedule/

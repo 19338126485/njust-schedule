@@ -39,6 +39,12 @@ self.addEventListener('fetch', (e) => {
       return resp;
     }).catch(() => {
       // 离线时 fallback 到缓存
+      // 对数据文件（带 ?v=... 时间戳），尝试不带查询参数的缓存匹配
+      const url = new URL(e.request.url);
+      if (url.pathname.endsWith('/data/schedule.json') || url.pathname.endsWith('/data/exams.json')) {
+        const cacheUrl = e.request.url.split('?')[0];
+        return caches.match(cacheUrl);
+      }
       return caches.match(e.request);
     })
   );
