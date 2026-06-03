@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-课表抓取测试脚本（支持金智IDS统一认证 + HTML解析）
+课表抓取测试脚本（浏览器自动化 + HTML解析）
 
 运行方式:
     python -m src.main
 
-认证流程:
-1. 先尝试IDS模拟登录（无头、快速）
-2. 失败则 fallback 到浏览器自动化（DrissionPage）
-3. 拿到IDS Cookie后，直接请求课表HTML页面并解析
+流程:
+1. 通过智慧理工门户浏览器自动化登录并获取课表HTML
+2. 解析HTML为结构化数据
 
 首次使用前:
 1. 复制 src/config.example.py 到 src/config.py
@@ -82,50 +81,6 @@ def print_schedule_table(courses):
             print(f"     📅 开课周次: {kkzc}")
 
 
-def try_ids_login(student_id: str, password: str):
-    """尝试IDS模拟登录"""
-    try:
-        from src.ids_auth import get_sso_session
-        print("\n[1/2] 尝试IDS模拟登录（无头模式）...")
-        session = get_sso_session(student_id, password)
-        if session:
-            return True, session
-        return False, None
-    except Exception as e:
-        print(f"[IDS] 模拟登录异常: {e}")
-        return False, None
-
-
-def try_browser_login(student_id: str, password: str):
-    """浏览器自动化兜底登录"""
-    try:
-        from src.browser_auth import get_cookies_via_browser
-        print("\n[Browser] 启动Edge浏览器完成SSO登录...")
-        print("    请留意弹出的浏览器窗口，如有验证码请在浏览器中手动处理")
-
-        cookies = get_cookies_via_browser(student_id, password, headless=False)
-        if not cookies:
-            return False, None
-
-        import requests
-        session = requests.Session()
-        for k, v in cookies.items():
-            session.cookies.set(k, v)
-
-        session.headers.update({
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
-            ),
-        })
-
-        return True, session
-
-    except Exception as e:
-        print(f"[Browser] 浏览器登录异常: {e}")
-        return False, None
-
-
 def get_week_from_start_date(start_date: str) -> int:
     """根据开学日期计算当前是第几周"""
     from datetime import datetime
@@ -158,84 +113,20 @@ def main():
 
     print(f"\n🎓 学号: {STUDENT_ID}")
 
-    # ---------- 认证阶段 ----------
-    session = None
-
-    # 第1步：尝试IDS模拟登录
-    ids_ok, session = try_ids_login(STUDENT_ID, PASSWORD)
-
-    # 第2步：失败则用浏览器兜底
-    if not ids_ok:
-        print("\n⚠️  IDS模拟登录未成功，准备使用浏览器自动化方案...")
-        choice = input("是否启动Edge浏览器完成登录？(y/n): ").strip().lower()
-
-        if choice == 'y':
-            browser_ok, session = try_browser_login(STUDENT_ID, PASSWORD)
-            if not browser_ok:
-                print("\n❌ 浏览器方案也失败了，无法继续获取课表")
-                return
-        else:
-            print("\n已取消，退出。")
-            return
-
-    print("\n✅ 认证完成！已获得教务系统访问权限")
-
-    # ---------- 获取课表HTML ----------
-    print("📡 正在连接教务系统课表页面...")
-    client = QiangzhiClient(STUDENT_ID, session=session)
-
-    # 请求课表页面
-    html = client.get_schedule_page()
+    # ---------- 获取课表HTML（浏览器自动化） ----------
+    print("📡 正在通过智慧理工门户获取课表...")
+    from src.portal_browser import get_schedule_via_portal
+    html = get_schedule_via_portal(STUDENT_ID, PASSWORD)
 
     if not html:
         print("❌ 无法获取课表页面")
-        print("   可能原因：")
-        print("   • Cookie已过期，需要重新登录")
-        print("   • 教务系统维护中")
-        print("   • 网络问题")
         return
 
-    # 检测返回的是否是登录页（SSO未完成）
-    is_login = (
-        "authserver/login" in html
-        or "pwdEncryptSalt" in html
-        or "统一身份认证" in html
-        or 'name="passwordText"' in html.lower()
-        # 强智系统自己的登录页特征
-        or "Verifyservlet" in html
-        or 'name="USERNAME"' in html
-        or 'name="PASSWORD"' in html
-        or "请先登录系统" in html
-        or "RANDOMCODE" in html
-        or "登录个人中心" in html
-    )
-
-    if is_login:
-        print("\n⚠️  requests SSO未成功，返回的是登录页面")
-        print("   切换到智慧理工门户方案（门户→强智票据跳转）...")
-        from src.portal_browser import get_schedule_via_portal
-        html = get_schedule_via_portal(STUDENT_ID, PASSWORD)
-
-        if not html:
-            print("❌ 门户方案也未能获取课表")
-            return
-        
-        # 再次检查浏览器返回的HTML是否真的是课表
-        still_login = (
-            "Verifyservlet" in html
-            or 'name="USERNAME"' in html
-            or "请先登录系统" in html
-            or "登录个人中心" in html
-        )
-        if still_login:
-            print("⚠️  浏览器返回的仍是登录页，SSO跳转未完成")
-            print("   请检查浏览器中的状态")
-            return
+    client = QiangzhiClient(STUDENT_ID)
 
     # 保存HTML供分析
     html_path = os.path.expanduser("~/Desktop/njust_schedule_page.html")
     client.save_schedule_html(html, html_path)
-
     print(f"\n📄 HTML已保存，你可以用浏览器打开查看: {html_path}")
 
     # ---------- 尝试解析课表 ----------

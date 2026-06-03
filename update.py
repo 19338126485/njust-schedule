@@ -27,43 +27,26 @@ from src.config import STUDENT_ID, PASSWORD
 
 
 def update_schedule():
-    """抓取课表并保存（优先requests，失败则用浏览器兜底）"""
+    """抓取课表并保存（浏览器自动化）"""
     print("\n" + "=" * 60)
     print("📚 正在抓取课表...")
     print("=" * 60)
 
-    html = None
-    courses = None
+    from src.portal_browser import get_schedule_via_portal
+    from src.api_client import QiangzhiClient
 
-    # 尝试1: requests IDS登录
-    print("[Update] 尝试 requests IDS 登录...")
-    from src.ids_auth import NJUSTIDSAuth
-    auth = NJUSTIDSAuth(STUDENT_ID, PASSWORD)
-    if auth.login():
-        print("[Update] IDS登录成功，尝试请求课表...")
-        from src.api_client import QiangzhiClient
-        client = QiangzhiClient(STUDENT_ID, session=auth.session)
-        html = client.get_schedule_page()
-        if html:
-            courses = client.parse_schedule_html(html)
-            if courses:
-                print(f"✅ requests方式解析到 {len(courses)} 门课程")
-
-    # 尝试2: 浏览器兜底（当requests方式失败时）
-    if not courses:
-        print("[Update] requests方式未获取到课表，启动浏览器兜底...")
-        from src.portal_browser import get_schedule_via_portal
-        html = get_schedule_via_portal(STUDENT_ID, PASSWORD)
-        if html:
-            from src.api_client import QiangzhiClient
-            client = QiangzhiClient(STUDENT_ID)
-            courses = client.parse_schedule_html(html)
-            if courses:
-                print(f"✅ 浏览器方式解析到 {len(courses)} 门课程")
-
-    if not courses:
-        print("❌ 课表抓取全部失败（requests + 浏览器）")
+    html = get_schedule_via_portal(STUDENT_ID, PASSWORD)
+    if not html:
+        print("❌ 浏览器获取课表HTML失败")
         return False
+
+    client = QiangzhiClient(STUDENT_ID)
+    courses = client.parse_schedule_html(html)
+    if not courses:
+        print("❌ 课表HTML解析失败")
+        return False
+
+    print(f"✅ 解析到 {len(courses)} 门课程")
 
     # 保存到 webapp 和 docs
     for rel_path in ["webapp/data/schedule.json", "docs/data/schedule.json"]:
