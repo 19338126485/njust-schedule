@@ -1,126 +1,27 @@
 """
-南京理工大学强智教务系统 API 客户端
+南京理工大学强智教务系统 课表HTML解析器
 
-封装强智 App API 的调用逻辑，包括：
-- 登录获取 Token
-- 获取当前学期/周次
-- 获取课表数据
+从强智教务系统的课表页面提取结构化课程数据。
 """
 
-import requests
-import json
-from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
 
 
 class QiangzhiClient:
     """
-    强智教务系统客户端
-
-    南理工已关闭 app.do JSON 接口，改为直接解析课表 HTML 页面。
+    强智教务系统课表解析客户端
 
     使用方式：
-        # 先通过IDS拿到session/cookie
-        from src.ids_auth import get_sso_session
-        session = get_sso_session("学号", "密码")
+        from src.portal_browser import get_schedule_via_portal
+        html = get_schedule_via_portal("学号", "密码")
 
-        # 然后用session创建客户端
-        client = QiangzhiClient("学号", session=session)
-        html = client.get_schedule_page()
+        client = QiangzhiClient("学号")
         courses = client.parse_schedule_html(html)
     """
 
-    BASE_URL = "http://bkjw.njust.edu.cn"
-    SCHEDULE_URL = (
-        "http://bkjw.njust.edu.cn/njlgdx/xskb/xskb_list.do"
-        "?Ves632DSdyV=NEW_XSD_PYGL"
-    )
-
-    def __init__(self, student_id: str, password: Optional[str] = None,
-                 session: Optional[requests.Session] = None):
+    def __init__(self, student_id: str, password: Optional[str] = None):
         self.student_id = student_id
         self.password = password
-
-        if session is not None:
-            self.session = session
-        else:
-            self.session = requests.Session()
-            self.session.headers.update({
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
-                ),
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "zh-CN,zh;q=0.9",
-            })
-
-    # ===================== 已废弃：app.do JSON 接口 =====================
-    # 南理工的 app.do 接口已关闭（返回404），以下方法保留但不再使用
-
-    def get_current_time(self, date: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """
-        【已废弃】尝试获取当前学期/周次 —— 南理工 app.do 已关闭
-        Fallback：使用配置中的开学日期手动计算
-        """
-        print("[API] ⚠️ app.do 接口已关闭，尝试从配置获取学期信息")
-        try:
-            from src.config import SEMESTER_START_DATE
-            start = datetime.strptime(SEMESTER_START_DATE, "%Y-%m-%d")
-            today = datetime.now()
-            days_diff = (today - start).days
-            if days_diff < 0:
-                week = 0
-            else:
-                week = days_diff // 7 + 1
-            return {
-                "xnxqh": "2025-2026-2",
-                "zc": week,
-                "s_time": SEMESTER_START_DATE,
-            }
-        except Exception:
-            return None
-
-    def get_schedule(self, semester: str, week: int) -> List[Dict[str, Any]]:
-        """【已废弃】app.do 课表接口已关闭"""
-        print("[API] ⚠️ app.do getKbcxAzc 接口已关闭")
-        return []
-
-    def get_current_week_schedule(self) -> List[Dict[str, Any]]:
-        """【已废弃】app.do 接口已关闭"""
-        print("[API] ⚠️ app.do 接口已关闭，请使用 get_schedule_page() + parse_schedule_html()")
-        return []
-
-    # ===================== 新方法：HTML 页面抓取 =====================
-
-    def get_schedule_page(self) -> Optional[str]:
-        """
-        直接请求课表HTML页面
-
-        使用已携带IDS Cookie的session访问课表URL。
-        SSO会自动在后台完成：强智系统发现未登录→302到IDS→IDS验证Cookie→
-        签发Ticket→强智验证→返回课表页。
-
-        Returns:
-            课表页面的HTML文本
-        """
-        try:
-            print(f"[API] 正在请求课表页面...")
-            resp = self.session.get(
-                self.SCHEDULE_URL,
-                allow_redirects=True,
-                timeout=20,
-            )
-            print(f"[API] 响应状态: {resp.status_code}, 最终URL: {resp.url}")
-
-            if resp.status_code == 200:
-                return resp.text
-            else:
-                print(f"[API] 请求失败: {resp.status_code}")
-                return None
-
-        except Exception as e:
-            print(f"[API] 获取课表页面失败: {e}")
-            return None
 
     def save_schedule_html(self, html: str, path: str) -> bool:
         """保存HTML到本地文件供调试分析"""
@@ -361,33 +262,33 @@ class QiangzhiClient:
 def parse_course_time(kcsj: str) -> tuple:
     """
     解析课程时间编码
-    
+
     强智系统的 kcsj 字段编码规则：
     - 第1位: 星期几 (1-7)
     - 后续: 节次，每两位一组
-    
+
     例如:
     - "10102" = 周一第1-2节
     - "30506" = 周三第5-6节
-    
+
     Args:
         kcsj: 课程时间编码字符串
-        
+
     Returns:
         (星期几, [节次列表])
     """
     if not kcsj or len(kcsj) < 3:
         return (0, [])
-    
+
     weekday = int(kcsj[0])
     periods = []
-    
+
     # 从第1位开始，每两位一组
     for i in range(1, len(kcsj), 2):
         if i + 1 < len(kcsj):
             period = int(kcsj[i:i+2])
             periods.append(period)
-    
+
     return (weekday, periods)
 
 
