@@ -6,7 +6,16 @@
   // ===== 常量 =====
   const JIE_COUNT = 14;
   const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
-  const SEMESTER_START = new Date('2026-03-02'); // 开学第一周周一
+
+  // 从 Storage 读取开学日期（schedule.js 先于 storage.js 加载，用函数延迟读取）
+  function getSemesterStart() {
+    try {
+      if (window.Storage && Storage.getStartDate) {
+        return new Date(Storage.getStartDate());
+      }
+    } catch (e) {}
+    return new Date('2026-03-02');
+  }
 
   // 小节时间（用于显示）
   const JIE_TIME = {
@@ -48,12 +57,13 @@
   // ===== 周次计算 =====
   function getCurrentWeek() {
     const now = new Date();
-    const diff = Math.floor((now - SEMESTER_START) / (1000 * 60 * 60 * 24));
+    const start = getSemesterStart();
+    const diff = Math.floor((now - start) / (1000 * 60 * 60 * 24));
     return Math.max(1, Math.floor(diff / 7) + 1);
   }
 
   function getWeekDates(week) {
-    const base = new Date(SEMESTER_START);
+    const base = getSemesterStart();
     base.setDate(base.getDate() + (week - 1) * 7);
     const dates = [];
     for (let i = 0; i < 7; i++) {

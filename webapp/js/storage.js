@@ -30,7 +30,7 @@
 
   // 获取开学日期
   function getStartDate() {
-    return localStorage.getItem(START_DATE_KEY) || '2026-02-17';
+    return localStorage.getItem(START_DATE_KEY) || '2026-03-02';
   }
 
   // 设置开学日期

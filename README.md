@@ -68,7 +68,7 @@
 ### 1. 安装Python依赖
 
 ```powershell
-pip install requests lxml DrissionPage icalendar python-dateutil PyExecJS beautifulsoup4
+pip install DrissionPage icalendar python-dateutil beautifulsoup4
 ```
 
 ### 2. 配置学号密码
