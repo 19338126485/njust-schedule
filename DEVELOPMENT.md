@@ -6,7 +6,7 @@
 
 ## 当前版本
 
-- **稳定版 tag**: `v2.1-clean-requests`
+- **稳定版 tag**: `v2.2-refactor`
 - **GitHub Pages**: https://19338126485.github.io/njust-schedule/
 
 ---
@@ -80,7 +80,7 @@
 
 `sw.js` 使用网络优先策略（fetch成功就用最新，失败才fallback缓存）。开发阶段避免缓存旧版本。
 
-**注意**：当前存在缓存匹配问题。`sw.js` 预缓存 `data/schedule.json`（无查询参数），但 `app.js` 实际请求 `data/schedule.json?v=...`（带时间戳）。Service Worker 的 `caches.match()` 精确匹配 URL（包括查询参数），导致离线时缓存 miss。待修复。
+**已修复**：`sw.js` 在 `fetch` 事件的 `catch` 分支中对 `data/schedule.json` 和 `data/exams.json` 请求做了查询参数剥离，离线时缓存可正确命中。
 
 ### 4. 数据格式：前端友好JSON
 
@@ -115,11 +115,8 @@ PWA渲染引擎用 `name/day/startJie/endJie/weeks/color`，ICS导出器用 `kss
 
 | 问题 | 影响 | 状态 |
 |------|------|------|
-| `portal_browser.py` 和 `exam_browser.py` 代码大量重复 | 维护成本高，改版要改两处 | 🔴 待重构 |
-| `schedule.js` 硬编码开学日期 | 用户设置日期后周次仍错 | 🔴 待修复 |
-| `storage.js` 默认日期与配置不一致 | 前后端周次计算不一致 | 🔴 待修复 |
-| Service Worker 缓存匹配缺陷 | 离线时数据文件可能加载失败 | 🔴 待修复 |
 | 课程时间重叠冲突显示 | 两个课在同一小节时可能重叠覆盖 | 🟡 待修复 |
+| `exam_parser.py` 硬编码中文表头 | 教务系统改字就解析失败 | 🟡 待改进 |
 | 课表抓取依赖浏览器自动化 | 必须在Windows电脑+Edge上运行 | 架构限制 |
 | 验证码场景需手动输入 | IDS偶尔触发验证码，脚本暂停等待 | 低概率 |
 | `exam_parser.py` 硬编码中文表头 | 教务系统改字就解析失败 | 🟡 待改进 |
@@ -139,10 +136,8 @@ PWA渲染引擎用 `name/day/startJie/endJie/weeks/color`，ICS导出器用 `kss
 
 | 功能 | 技术方案 | 复杂度 |
 |------|----------|--------|
-| **提取浏览器公共基类** | 将 portal_browser + exam_browser 的公共部分提取为 `browser/base.py` 和 `browser/portal_flow.py` | 中 |
 | **课程时间重叠冲突显示** | Grid布局中同一格子多个课程时，用flex column堆叠或交替显示 | 中 |
-| **修复前端日期不一致** | `schedule.js` 读取 `Storage.getStartDate()` 替代硬编码 | 低 |
-| **修复SW缓存匹配** | 对 `data/*.json` 请求做查询参数剥离 | 低 |
+| **考试解析器表头模糊匹配** | 兼容"考场"/"考试地点"等变体 | 低 |
 
 ### 中优先级
 
@@ -244,4 +239,4 @@ page.to_tab(index)         # 切换到指定索引的标签页
 ---
 
 *最后更新: 2026-06-03*  
-*对应版本: v2.1-clean-requests*
+*对应版本: v2.2-refactor*
