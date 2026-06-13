@@ -357,23 +357,6 @@
     "jssj": "21:25"
   },
   {
-    "name": "体育（Ⅳ）",
-    "teacher": "任明",
-    "location": "江阴运动场东跑道",
-    "day": 3,
-    "startJie": 2,
-    "endJie": 3,
-    "weeks": "1-16",
-    "color": 8,
-    "kcmc": "体育（Ⅳ）",
-    "jsxm": "任明",
-    "jsmc": "江阴运动场东跑道",
-    "kcsj": "30203",
-    "kkzc": "1-16",
-    "kssj": "08:50",
-    "jssj": "10:25"
-  },
-  {
     "name": "新中国史",
     "teacher": "课程中心",
     "location": "",

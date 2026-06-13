@@ -1,7 +1,7 @@
 # 南京理工大学课表项目 - 开发计划
 
 **项目目标**: 替代「周三课表」小程序，长期自用的课表查询工具  
-**当前稳定版本**: `v2.1-clean-requests`  
+**当前稳定版本**: `v2.2-refactor`  
 **开发状态**: 活跃维护中
 
 ---
@@ -28,6 +28,13 @@
 - [x] 简化 `main.py`：直接走 portal_browser，删除两个 login 函数
 - [x] 简化 `update.py`：直接走浏览器自动化
 
+### v2.2-refactor — 浏览器基类提取 + 前端修复 + 依赖清理
+- [x] 提取 `enter_qiangzhi_system()` 公共函数，消除 portal_browser/exam_browser 重复代码
+- [x] `schedule.js` 从 `Storage.getStartDate()` 读取开学日期，替代硬编码
+- [x] `storage.js` 默认开学日期同步为 `2026-03-02`
+- [x] `sw.js` 修复带 `?v=...` 查询参数的缓存匹配
+- [x] `requirements.txt` 移除 `requests`、`PyExecJS`、`lxml`
+
 ---
 
 ## 待修复的已知问题
@@ -36,58 +43,31 @@
 
 | 问题 | 影响 | 文件 |
 |------|------|------|
-| `portal_browser.py` 和 `exam_browser.py` 80%代码重复 | 教务系统改版要改两处 | `src/portal_browser.py`, `src/exam_browser.py` |
-| `schedule.js` 硬编码开学日期 `2026-03-02` | 用户设置开学日期后周次仍错 | `webapp/js/schedule.js` |
-| `storage.js` 默认开学日期 `'2026-02-17'` 与配置不一致 | 前后端周次计算不一致 | `webapp/js/storage.js` |
-| Service Worker 缓存 `data/*.json` 不带查询参数，但 `app.js` 请求带 `?v=...` | 离线时数据文件缓存 miss | `webapp/sw.js` |
+| 课程时间重叠时 UI 覆盖 | 同一格子多门课只显示一个 | `webapp/css/style.css`, `webapp/js/schedule.js` |
+| `exam_parser.py` 表头硬编码中文 | 教务系统改字就解析失败 | `src/exam_parser.py` |
 
 ### 🟡 中优先级
 
 | 问题 | 影响 | 文件 |
 |------|------|------|
-| 课程时间重叠时 UI 覆盖 | 同一格子多门课只显示一个 | `webapp/css/style.css`, `webapp/js/schedule.js` |
 | `ics_exporter.py` fallback 时间映射与实际课表不符 | ICS 导出时间可能偏差 | `src/ics_exporter.py` |
-| `requirements.txt` 包含 `requests`, `PyExecJS` 等不再需要依赖 | 安装冗余 | `requirements.txt` |
-| `exam_parser.py` 表头硬编码中文 | 教务系统改个字就解析失败 | `src/exam_parser.py` |
+| `exams_main.py` 和 `update.py` 有重复的数据保存逻辑 | 代码冗余 | `src/exams_main.py`, `update.py` |
 
 ### 🟢 低优先级
 
 | 问题 | 影响 |
 |------|------|
-| `exams_main.py` 和 `update.py` 有重复的数据保存逻辑 | 代码冗余 |
 | `update.py` 的 commit message 是固定格式 | 不区分课表/考试/双更新的场景 |
 
 ---
 
-## 重构路线图
+## 重构路线图（已完成 Phase 1-3，剩余可选优化）
 
-### Phase 1: 提取浏览器公共基类
+### 课程冲突显示
+Grid布局中同一格子多个课程时，用flex column堆叠或交替显示。
 
-**目标**: 合并 `portal_browser.py` 和 `exam_browser.py` 的重复部分
-
-**提取内容**:
-```
-src/browser/
-    base.py          ← _safe_import_drission, _init_browser, _poll_url_change
-    portal_flow.py   ← 门户登录 → IDS登录 → 点击教务系统 → 标签页切换
-    schedule_flow.py ← portal_flow + 点击课表入口
-    exam_flow.py     ← portal_flow + 点击考试报名 + 触发查询
-```
-
-**收益**: 教务系统登录流程改版时，只改一个地方。
-
-### Phase 2: 前端修复
-
-1. `schedule.js` 从 `Storage.getStartDate()` 读取开学日期
-2. `storage.js` 默认日期同步为 `2026-03-02`
-3. `sw.js` 缓存策略修复：对 `data/*.json` 的请求做查询参数剥离，或改用正确的 cache-busting
-4. 课程冲突显示：同一格子多门课时用 flex column 堆叠
-
-### Phase 3: 基础设施清理
-
-1. `requirements.txt` 移除 `requests`, `PyExecJS`
-2. `exam_parser.py` 表头映射改为模糊匹配（兼容"考场"/"考试地点"等变体）
-3. `update.py` commit message 增加变更摘要（课表/考试/双更新）
+### 考试解析器健壮性
+`exam_parser.py` 表头映射改为模糊匹配（兼容"考场"/"考试地点"等变体）。
 
 ---
 
