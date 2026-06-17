@@ -1,14 +1,38 @@
 [
   {
     "index": "1",
-    "exam_code": "JY001009",
-    "course_code": "11024002",
-    "course_name": "工程数学",
-    "exam_time": "2026-06-10 15:50~17:50",
-    "date": "2026-06-10",
-    "start_time": "15:50",
-    "end_time": "17:50",
+    "exam_code": "JY001001",
+    "course_code": "11022601",
+    "course_name": "概率与统计",
+    "exam_time": "2026-06-22 10:00~12:00",
+    "date": "2026-06-22",
+    "start_time": "10:00",
+    "end_time": "12:00",
+    "room": "江阴致新B101",
+    "seat": "52"
+  },
+  {
+    "index": "2",
+    "exam_code": "JY001005",
+    "course_code": "67002701",
+    "course_name": "硬件系统设计基础",
+    "exam_time": "2026-06-23 13:30~15:30",
+    "date": "2026-06-23",
+    "start_time": "13:30",
+    "end_time": "15:30",
+    "room": "江阴致道A102",
+    "seat": "60"
+  },
+  {
+    "index": "3",
+    "exam_code": "JY001018",
+    "course_code": "15045305",
+    "course_name": "毛泽东思想和中国特色社会主义理论体系概论",
+    "exam_time": "2026-06-26 13:30~15:30",
+    "date": "2026-06-26",
+    "start_time": "13:30",
+    "end_time": "15:30",
     "room": "江阴格物B108",
-    "seat": "37"
+    "seat": "23"
   }
 ]
