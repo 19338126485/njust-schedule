@@ -34,5 +34,17 @@
     "end_time": "15:30",
     "room": "江阴格物B108",
     "seat": "23"
+  },
+  {
+    "index": "4",
+    "exam_code": "JY001001",
+    "course_code": "04026403",
+    "course_name": "模拟电路与数字电路",
+    "exam_time": "2026-06-29 10:00~12:00",
+    "date": "2026-06-29",
+    "start_time": "10:00",
+    "end_time": "12:00",
+    "room": "江阴格物C104",
+    "seat": "66"
   }
 ]
