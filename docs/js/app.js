@@ -69,7 +69,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     pwResolver = null;
     r(pw);
   }
+  // 取消输入：关闭弹窗并返回 null，调用方显示空态
+  function cancelPw() {
+    if (!pwResolver) return;
+    pwOverlay.hidden = true;
+    const r = pwResolver;
+    pwResolver = null;
+    r(null);
+  }
   document.getElementById('btn-pw-ok').addEventListener('click', submitPw);
+  document.getElementById('btn-pw-cancel').addEventListener('click', cancelPw);
   pwInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitPw(); });
 
   async function getPassword() {
@@ -112,11 +121,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (!isEnvelope(envelope)) return [];
 
-    // 3. 解密；密码错误（AES-GCM 校验失败）则清除已存密码并重试
+    // 3. 解密；密码错误（AES-GCM 校验失败）则清除已存密码并重试；用户取消则返回空数据（显示空态）
     let firstTry = true;
     while (true) {
       const pw = firstTry ? await getPassword() : await askPassword(true);
       firstTry = false;
+      if (pw == null) return []; // 用户点了取消
       try {
         const plain = await decryptEnvelope(envelope, pw);
         localStorage.setItem(lsKey, JSON.stringify(envelope));
@@ -152,7 +162,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!localStorage.getItem(FIRST_RUN_KEY)) {
     // 首次打开，提示设置开学日期
     setTimeout(() => {
-      if (confirm('首次使用请确认开学日期\n\n当前设置：2026-03-02（南理工春季学期）\n\n每年开学日期可能不同，如不正确请点击"确定"在菜单中修改。')) {
+      if (confirm('首次使用请确认开学日期\n\n当前设置：' + Storage.getStartDate() + '\n\n每年开学日期可能不同，如不正确请点击"确定"在菜单中修改。')) {
         document.getElementById('date-input').value = Storage.getStartDate();
         document.getElementById('date-modal-overlay').hidden = false;
       }
@@ -200,7 +210,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function renderExams() {
     const examData = exams || [];
     if (!examData.length) {
-      examsContent.innerHTML = '<p class="empty-state">暂无考试数据<br><br>请在电脑端运行<br><code>python -m src.exams_main</code><br>更新考试安排</p>';
+      examsContent.innerHTML = '<p class="empty-state">暂无考试数据<br><br>请在电脑端运行 update.bat<br>更新考试安排</p>';
       return;
     }
     let html = '<table class="exam-table">';
@@ -241,8 +251,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       // 用当前密码加密后缓存密文（明文不落 localStorage）
       try {
         const pw = await getPassword();
-        const env = await encryptEnvelope(data, pw);
-        localStorage.setItem(SCHEDULE_KEY, JSON.stringify(env));
+        if (pw != null) {
+          const env = await encryptEnvelope(data, pw);
+          localStorage.setItem(SCHEDULE_KEY, JSON.stringify(env));
+        }
       } catch (cacheErr) {
         console.error('缓存导入课表失败:', cacheErr);
       }
@@ -306,37 +318,58 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       let msg = '';
 
+      // 拉取并解密一类数据（schedule/exams）。
+      // 网络失败抛错由调用方提示；解密失败（密码错误）清除已存密码并重新弹密码框；用户取消返回 null。
+      async function fetchAndDecrypt(kind) {
+        const res = await fetch('data/' + kind + '.enc.json?v=' + Date.now());
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const env = await res.json();
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const pw = attempt === 0 ? await getPassword() : await askPassword(true);
+          if (pw == null) return null; // 用户取消
+          try {
+            const plain = await decryptEnvelope(env, pw);
+            // 缓存密文 envelope（明文不落 localStorage）
+            const lsKey = kind === 'schedule' ? SCHEDULE_KEY : EXAMS_KEY;
+            localStorage.setItem(lsKey, JSON.stringify(env));
+            return plain;
+          } catch (e) {
+            if (e && e.name === 'OperationError') {
+              // 密码错误：清除已存密码，下一轮重新弹密码框
+              sessionStorage.removeItem(PW_KEY);
+            } else {
+              throw e;
+            }
+          }
+        }
+        return null; // 多次密码错误
+      }
+
       // 重新拉取课表
       try {
-        const res = await fetch('data/schedule.enc.json?v=' + Date.now());
-        if (res.ok) {
-          const env = await res.json();
-          const pw = await getPassword();
-          courses = await decryptEnvelope(env, pw);
-          localStorage.setItem(SCHEDULE_KEY, JSON.stringify(env));
+        const data = await fetchAndDecrypt('schedule');
+        if (data == null) {
+          msg += '课表未更新（已取消或密码错误）\n';
+        } else {
+          courses = data;
           Schedule.init(courses);
           msg += '课表已更新！共 ' + courses.length + ' 个时间段\n';
-        } else {
-          msg += '课表拉取失败\n';
         }
       } catch (e) {
-        msg += '课表拉取失败: ' + e.message + '\n';
+        msg += '课表拉取失败，请检查网络后重试: ' + e.message + '\n';
       }
 
       // 重新拉取考试
       try {
-        const res = await fetch('data/exams.enc.json?v=' + Date.now());
-        if (res.ok) {
-          const env = await res.json();
-          const pw = await getPassword();
-          exams = await decryptEnvelope(env, pw);
-          localStorage.setItem(EXAMS_KEY, JSON.stringify(env));
-          msg += '考试已更新！共 ' + exams.length + ' 场考试';
+        const data = await fetchAndDecrypt('exams');
+        if (data == null) {
+          msg += '考试未更新（已取消或密码错误）';
         } else {
-          msg += '考试拉取失败';
+          exams = data;
+          msg += '考试已更新！共 ' + exams.length + ' 场考试';
         }
       } catch (e) {
-        msg += '考试拉取失败: ' + e.message;
+        msg += '考试拉取失败，请检查网络后重试: ' + e.message;
       }
 
       alert(msg);

@@ -6,7 +6,7 @@
 
 ## 当前版本
 
-- **稳定版 tag**: `v2.2-refactor`
+- **稳定版 tag**: `v2.1-clean-requests`
 - **GitHub Pages**: https://19338126485.github.io/njust-schedule/
 
 ---
@@ -17,7 +17,6 @@
 |------|------|
 | 课表抓取 | 浏览器自动化：门户 → 教务系统 → 课表 → 解析HTML → 加密为 `schedule.enc.json` |
 | 考试抓取 | 浏览器自动化：门户 → 教务系统 → 考试报名 → 查询 → 加密为 `exams.enc.json` |
-| ICS导出 | 将课表导出为 `.ics` 日历文件，支持手机/电脑日历导入 |
 | PWA手机端 | 离线可用，周视图/日视图，课程弹窗详情 |
 | 一键更新 | 双击 `update.bat` 自动抓取 + push 到 GitHub Pages |
 | 在线刷新 | PWA菜单里「🔄 刷新数据」清除缓存并重新拉取 |
@@ -51,7 +50,6 @@
 | `src/exam_browser.py` | 考试查询浏览器流程。复用 portal_browser 的部分逻辑 |
 | `src/exam_parser.py` | 考试HTML解析。解析 `<table id="dataList">` |
 | `src/api_client.py` | 强智系统课表HTML解析器。输出前端友好JSON |
-| `src/ics_exporter.py` | ICS日历导出。支持单双周、课前提醒 |
 | `src/crypto_helper.py` | 数据加密。PBKDF2-SHA256(200000) → AES-256-GCM，输出 envelope JSON |
 | `webapp/js/schedule.js` | 课表渲染引擎。Grid布局，周/日视图切换 |
 | `webapp/js/app.js` | PWA主逻辑。数据加载（WebCrypto 解密）、密码输入、弹窗、刷新按钮 |
@@ -106,7 +104,7 @@
 }
 ```
 
-PWA渲染引擎用 `name/day/startJie/endJie/weeks/color`，ICS导出器用 `kssj/jssj/kkzc`。
+PWA渲染引擎用 `name/day/startJie/endJie/weeks/color`。
 
 ---
 
@@ -120,7 +118,6 @@ PWA渲染引擎用 `name/day/startJie/endJie/weeks/color`，ICS导出器用 `kss
 | `exam_parser.py` 硬编码中文表头 | 教务系统改字就解析失败 | 🟡 待改进 |
 | 课表抓取依赖浏览器自动化 | 必须在Windows电脑+Edge上运行 | 架构限制 |
 | 验证码场景需手动输入 | IDS偶尔触发验证码，脚本暂停等待 | 低概率 |
-| `exam_parser.py` 硬编码中文表头 | 教务系统改字就解析失败 | 🟡 待改进 |
 
 ### 浏览器兼容性
 
@@ -189,8 +186,8 @@ git push origin main
 ### 测试课表解析
 
 ```powershell
-cd "C:\Users\19338\Desktop\学习相关\南京理工大学个人课表项目"
-python -m src.main
+cd <项目目录>
+python update.py
 ```
 
 查看输出中的周次是否正确（如「模拟与数字电路综合实验」应为 `16`，不是 `1-16`）。
@@ -198,7 +195,7 @@ python -m src.main
 ### 测试考试查询
 
 ```powershell
-python -m src.exams_main
+python update.py
 ```
 
 ---
@@ -209,7 +206,7 @@ python -m src.exams_main
 |------|------|------|
 | DrissionPage | 4.1.1.2 | 浏览器自动化 |
 | beautifulsoup4 | >=4.12.0 | HTML解析 |
-| icalendar | - | ICS日历导出 |
+| cryptography | >=41.0.0 | 数据加密（AES-256-GCM） |
 
 ### DrissionPage 4.x API差异
 
@@ -239,5 +236,5 @@ page.to_tab(index)         # 切换到指定索引的标签页
 
 ---
 
-*最后更新: 2026-06-03*  
-*对应版本: v2.2-refactor*
+*最后更新: 2026-08-23*  
+*对应版本: v2.1-clean-requests*

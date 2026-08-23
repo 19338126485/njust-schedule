@@ -23,17 +23,6 @@ class QiangzhiClient:
         self.student_id = student_id
         self.password = password
 
-    def save_schedule_html(self, html: str, path: str) -> bool:
-        """保存HTML到本地文件供调试分析"""
-        try:
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(html)
-            print(f"[API] HTML已保存: {path} ({len(html)} bytes)")
-            return True
-        except Exception as e:
-            print(f"[API] 保存失败: {e}")
-            return False
-
     def _extract_weeks_from_week_view(self, soup) -> Dict[Tuple[str, int], List[str]]:
         """
         从周视图表格提取 (课程名, 天) -> [周次列表] 映射。
@@ -257,42 +246,3 @@ class QiangzhiClient:
 
         print(f"[API] 解析完成，共 {len(courses)} 个课程时间段")
         return courses
-
-
-def parse_course_time(kcsj: str) -> tuple:
-    """
-    解析课程时间编码
-
-    强智系统的 kcsj 字段编码规则：
-    - 第1位: 星期几 (1-7)
-    - 后续: 节次，每两位一组
-
-    例如:
-    - "10102" = 周一第1-2节
-    - "30506" = 周三第5-6节
-
-    Args:
-        kcsj: 课程时间编码字符串
-
-    Returns:
-        (星期几, [节次列表])
-    """
-    if not kcsj or len(kcsj) < 3:
-        return (0, [])
-
-    weekday = int(kcsj[0])
-    periods = []
-
-    # 从第1位开始，每两位一组
-    for i in range(1, len(kcsj), 2):
-        if i + 1 < len(kcsj):
-            period = int(kcsj[i:i+2])
-            periods.append(period)
-
-    return (weekday, periods)
-
-
-def format_weekday(weekday: int) -> str:
-    """将数字星期转换为中文"""
-    weekdays = ["", "周一", "周二", "周三", "周四", "周五", "周六", "周日"]
-    return weekdays[weekday] if 1 <= weekday <= 7 else "未知"

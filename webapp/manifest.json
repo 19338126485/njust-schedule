@@ -3,6 +3,8 @@
   "short_name": "课表",
   "description": "南京理工大学个人课表",
   "start_url": ".",
+  "scope": "./",
+  "id": ".",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2d8cf0",

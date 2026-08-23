@@ -7,14 +7,25 @@
   const JIE_COUNT = 14;
   const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
 
+  // 数据字段转义，防止 innerHTML 注入
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   // 从 Storage 读取开学日期（schedule.js 先于 storage.js 加载，用函数延迟读取）
+  // 默认开学日期统一在 storage.js 的 DEFAULT_START_DATE 定义（每学期开学时改那里）
   function getSemesterStart() {
     try {
       if (window.Storage && Storage.getStartDate) {
         return new Date(Storage.getStartDate());
       }
     } catch (e) {}
-    return new Date('2026-03-02');
+    return new Date('2026-03-02'); // 兜底值，正常不会走到；改开学日期请改 storage.js
   }
 
   // 小节时间（用于显示）
@@ -148,9 +159,9 @@
       card.style.gridColumn = `${course.day + 1}`;
       card.style.gridRow = `${course.startJie} / ${course.endJie + 1}`;
       card.innerHTML = `
-        <div class="course-name">${course.name}</div>
-        <div class="course-location">${course.location || ''}</div>
-        <div class="course-teacher">${course.teacher || ''}</div>
+        <div class="course-name">${escapeHtml(course.name)}</div>
+        <div class="course-location">${escapeHtml(course.location || '')}</div>
+        <div class="course-teacher">${escapeHtml(course.teacher || '')}</div>
       `;
       card.addEventListener('click', () => showModal(course));
       grid.appendChild(card);
@@ -190,8 +201,8 @@
       el.innerHTML = `
         <div class="day-time-tag">${formatCourseTime(c)}</div>
         <div class="day-info">
-          <div class="day-course-name">${c.name}</div>
-          <div class="day-course-meta">${c.location || ''} · ${c.teacher || ''}</div>
+          <div class="day-course-name">${escapeHtml(c.name)}</div>
+          <div class="day-course-meta">${escapeHtml(c.location || '')} · ${escapeHtml(c.teacher || '')}</div>
         </div>
       `;
       el.addEventListener('click', () => showModal(c));
@@ -222,9 +233,9 @@
   function showModal(course) {
     document.getElementById('modal-title').textContent = course.name;
     document.getElementById('modal-time').innerHTML = `<strong>时间：</strong>星期${WEEKDAYS[course.day - 1]} ${formatCourseTime(course)}（第${course.startJie}-${course.endJie}小节）`;
-    document.getElementById('modal-location').innerHTML = `<strong>地点：</strong>${course.location || '未指定'}`;
-    document.getElementById('modal-teacher').innerHTML = `<strong>教师：</strong>${course.teacher || '未指定'}`;
-    document.getElementById('modal-weeks').innerHTML = `<strong>周次：</strong>${course.weeks || '全学期'}`;
+    document.getElementById('modal-location').innerHTML = `<strong>地点：</strong>${escapeHtml(course.location || '未指定')}`;
+    document.getElementById('modal-teacher').innerHTML = `<strong>教师：</strong>${escapeHtml(course.teacher || '未指定')}`;
+    document.getElementById('modal-weeks').innerHTML = `<strong>周次：</strong>${escapeHtml(course.weeks || '全学期')}`;
     document.getElementById('modal-overlay').hidden = false;
   }
 
@@ -233,7 +244,7 @@
   }
 
   // ===== 导航 =====
-  function prevWeek() { currentWeek--; render(); }
+  function prevWeek() { if (currentWeek > 1) { currentWeek--; render(); } }
   function nextWeek() { currentWeek++; render(); }
   function toggleView() {
     viewMode = viewMode === 'week' ? 'day' : 'week';
@@ -287,10 +298,14 @@
   }
 
   // ===== 初始化 =====
+  let listenersBound = false; // 监听器只绑定一次，init() 可能被多次调用（刷新/导入）
   function init(data) {
     courses = migrateOldFormat(data || []);
     currentWeek = getCurrentWeek();
     render();
+
+    if (listenersBound) return;
+    listenersBound = true;
 
     document.getElementById('btn-prev-week').addEventListener('click', prevWeek);
     document.getElementById('btn-next-week').addEventListener('click', nextWeek);

@@ -124,23 +124,15 @@ def get_exams_via_portal(student_id: str, password: str) -> Optional[str]:
         if has_data:
             print("[Exam] 成功获取考试安排HTML")
         else:
-            print("[Exam] 页面似乎不含考试数据，保存供分析")
-
-        # 保存HTML到文件
-        # 跨平台获取桌面路径
-        desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
-        if not os.path.exists(desktop_path):
-            desktop_path = os.path.join(os.path.expanduser("~"), "桌面")
-        save_path = os.path.join(desktop_path, "njust_exams_page.html")
-        with open(save_path, "w", encoding="utf-8") as f:
-            f.write(html)
-        print(f"[Exam] HTML已保存: {save_path} ({len(html)} bytes)")
+            print("[Exam] 页面不含任何考试特征，判定为抓取失败")
 
         try:
             browser_page.quit()
         except:
             pass
-        return html
+        # 无考试特征时返回 None，由调用方保留旧数据；
+        # 页面正常但无考试表格（has_data=True、解析结果为 []）属于"真的没考试"，正常返回
+        return html if has_data else None
 
     except Exception as e:
         print(f"[Exam] 浏览器自动化异常: {e}")

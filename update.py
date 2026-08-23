@@ -91,10 +91,11 @@ def update_exams():
 
     html = get_exams_via_portal(STUDENT_ID, PASSWORD)
     if not html:
-        print("❌ 考试抓取失败")
+        # 页面不含考试特征，判定为抓取失败：跳过保存，保留现有数据
+        print("⚠️ 未获取到考试数据，保留现有数据不变")
         return False
 
-    # 解析
+    # 解析（页面正常但无考试表格时结果为 []，属于"真的没考试"，正常保存）
     exams = parse_exam_html(html)
     print(f"✅ 解析到 {len(exams)} 场考试")
     save_encrypted(exams, "exams")
@@ -110,9 +111,11 @@ def git_push():
 
     os.chdir(project_dir)
 
-    # add（只精确添加项目相关目录，避免误提交根目录杂散文件）
+    # add（精确添加项目相关文件，避免误提交根目录杂散文件）
     subprocess.run(
-        ["git", "add", "webapp", "docs", "src", ".gitignore"],
+        ["git", "add", "webapp", "docs", "src", ".gitignore",
+         "README.md", "DEVELOPMENT.md", "update.py", "update.bat",
+         "requirements.txt", "capacitor.config.json", "package.json", "package-lock.json"],
         capture_output=True, encoding="utf-8", errors="replace"
     )
 
@@ -177,7 +180,11 @@ def main():
     ok_exams = update_exams()
 
     if ok_schedule or ok_exams:
-        git_push()
+        if not git_push():
+            print("\n" + "=" * 60)
+            print("❌ 推送失败，请检查网络后重试")
+            print("=" * 60)
+            return 1
         print("\n" + "=" * 60)
         print("🎉 更新完成！")
         print("   手机上刷新即可看到最新数据:")

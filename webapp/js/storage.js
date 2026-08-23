@@ -6,31 +6,12 @@
   const STORAGE_KEY = 'njust_schedule_data';
   const START_DATE_KEY = 'njust_semester_start';
 
-  // 加载课表数据
-  function loadCourses() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch (e) {
-      console.error('Storage load error:', e);
-    }
-    return null;
-  }
-
-  // 保存课表数据
-  function saveCourses(courses) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(courses));
-      return true;
-    } catch (e) {
-      console.error('Storage save error:', e);
-      return false;
-    }
-  }
+  // 默认开学日期（第一周周一）——每学期开学时改这里
+  const DEFAULT_START_DATE = '2026-03-02';
 
   // 获取开学日期
   function getStartDate() {
-    return localStorage.getItem(START_DATE_KEY) || '2026-03-02';
+    return localStorage.getItem(START_DATE_KEY) || DEFAULT_START_DATE;
   }
 
   // 设置开学日期
@@ -70,27 +51,6 @@
     });
   }
 
-  // 加载考试数据
-  function loadExams() {
-    try {
-      const raw = localStorage.getItem('njust_exams_data');
-      if (raw) return JSON.parse(raw);
-    } catch (e) {
-      console.error('Exams load error:', e);
-    }
-    return null;
-  }
-
-  // 保存考试数据
-  function saveExams(exams) {
-    try {
-      localStorage.setItem('njust_exams_data', JSON.stringify(exams));
-      return true;
-    } catch (e) {
-      console.error('Exams save error:', e);
-      return false;
-    }
-  }
   // 清除考试数据（用于刷新）
   function clearExams() {
     localStorage.removeItem('njust_exams_data');
@@ -99,5 +59,5 @@
   function clearCourses() {
     localStorage.removeItem(STORAGE_KEY);
   }
-  window.Storage = { loadCourses, saveCourses, getStartDate, setStartDate, exportToFile, importFromFile, loadExams, saveExams, clearCourses, clearExams };
+  window.Storage = { DEFAULT_START_DATE, getStartDate, setStartDate, exportToFile, importFromFile, clearCourses, clearExams };
 })();
