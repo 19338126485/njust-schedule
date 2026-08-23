@@ -55,6 +55,7 @@
 │   ├── sw.js               ← Service Worker（离线缓存）
 │   └── manifest.json
 ├── docs/                   ← GitHub Pages 部署目录（webapp 的副本）
+├── android/                ← Capacitor 安卓壳（已暂停维护，见 DEVELOPMENT.md）
 ├── requirements.txt        ← Python依赖
 ├── .gitignore
 └── README.md

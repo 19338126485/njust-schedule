@@ -106,6 +106,16 @@
 
 PWA渲染引擎用 `name/day/startJie/endJie/weeks/color`。
 
+### 5. Android APK 方案：暂时放弃（2026-08）
+
+**结论**：`android/`（Capacitor 打包）暂停维护，手机端只用网页 PWA。
+
+**原因**：Capacitor 默认把 `webapp/` 整个打包进 APK，数据是构建时刻的快照，无法远程更新——每次课表更新都要重新打包并覆盖安装，对本项目"电脑定期更新、手机随时拉取"的使用方式等于无用。网页 PWA（GitHub Pages + 网络优先 Service Worker）已完全满足同一需求，且无需安装任何东西。
+
+**保留物**：`android/` 目录和 `capacitor.config.json` 保留在仓库中不删除、不维护；构建已可用（`android/gradle.properties` 已加 `android.overridePathCheck=true` 解决中文路径问题，`cd android && ./gradlew assembleDebug` 可出包）。
+
+**重启条件**：仅当需要网页 PWA 做不到的原生能力（如课前系统通知、桌面课表小组件）时才值得重启此方案。届时应把 APK 改为运行时从 GitHub Pages 远程拉取数据的薄壳，而不是内置数据快照。
+
 ---
 
 ## 已知问题与限制
