@@ -3,47 +3,136 @@
 document.addEventListener('DOMContentLoaded', async () => {
   'use strict';
 
-  // 1. 加载课表数据（优先localStorage，其次schedule.json）
-  let courses = Storage.loadCourses();
+  // ===== 数据解密（WebCrypto: PBKDF2-SHA256 → AES-256-GCM，与 src/crypto_helper.py 互通）=====
+  const PW_KEY = 'njust_pw';
+  const SCHEDULE_KEY = 'njust_schedule_data';
+  const EXAMS_KEY = 'njust_exams_data';
 
-  // 检测旧格式（有kcmc字段但缺少name/day/startJie）或空数组，强制重新拉取
-  if (courses && courses.length > 0 && !courses[0].name) {
-    console.warn('检测到旧格式课表数据，清除缓存并重新拉取');
-    Storage.saveCourses([]);
-    courses = null;
+  function b64ToBuf(b64) {
+    const bin = atob(b64);
+    const buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    return buf;
   }
-  if (!courses || !courses.length) {
+  function bufToB64(buf) {
+    let bin = '';
+    const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+  // envelope 格式判断：{"v":1,...,"salt","iv","data"}，旧明文课表是数组，会被排除
+  function isEnvelope(obj) {
+    return obj && typeof obj === 'object' && !Array.isArray(obj) && obj.v && obj.salt && obj.iv && obj.data;
+  }
+  async function deriveKey(password, salt, iterations) {
+    const baseKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', hash: 'SHA-256', salt, iterations },
+      baseKey,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt', 'encrypt']
+    );
+  }
+  async function decryptEnvelope(envelope, password) {
+    const key = await deriveKey(password, b64ToBuf(envelope.salt), envelope.iter);
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64ToBuf(envelope.iv) }, key, b64ToBuf(envelope.data));
+    return JSON.parse(new TextDecoder().decode(plain));
+  }
+  async function encryptEnvelope(obj, password) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(password, salt, 200000);
+    const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(JSON.stringify(obj)));
+    return { v: 1, alg: 'AES-GCM', kdf: 'PBKDF2-SHA256', iter: 200000, salt: bufToB64(salt), iv: bufToB64(iv), data: bufToB64(data) };
+  }
+
+  // ===== 密码输入（存 sessionStorage，关标签页即失效）=====
+  const pwOverlay = document.getElementById('pw-overlay');
+  const pwInput = document.getElementById('pw-input');
+  const pwError = document.getElementById('pw-error');
+  let pwResolver = null;
+
+  function askPassword(showError) {
+    pwOverlay.hidden = false;
+    pwError.hidden = !showError;
+    pwInput.value = '';
+    setTimeout(() => pwInput.focus(), 50);
+    return new Promise((resolve) => { pwResolver = resolve; });
+  }
+  function submitPw() {
+    const pw = pwInput.value;
+    if (!pw || !pwResolver) return;
+    sessionStorage.setItem(PW_KEY, pw);
+    pwOverlay.hidden = true;
+    const r = pwResolver;
+    pwResolver = null;
+    r(pw);
+  }
+  document.getElementById('btn-pw-ok').addEventListener('click', submitPw);
+  pwInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitPw(); });
+
+  async function getPassword() {
+    const saved = sessionStorage.getItem(PW_KEY);
+    if (saved) return saved;
+    return askPassword(false);
+  }
+
+  // ===== 加密数据加载：localStorage 只缓存密文 envelope，明文只留内存 =====
+  async function loadEncryptedData(kind) {
+    const lsKey = kind === 'schedule' ? SCHEDULE_KEY : EXAMS_KEY;
+    const path = 'data/' + kind + '.enc.json';
+
+    // 1. 读 localStorage 缓存；旧明文缓存（非 envelope）直接丢弃
+    let envelope = null;
     try {
-      const res = await fetch('data/schedule.json?v=' + Date.now());
-      if (res.ok) {
-        courses = await res.json();
-        Storage.saveCourses(courses);
-        console.log('Loaded from schedule.json');
+      const raw = localStorage.getItem(lsKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (isEnvelope(parsed)) {
+          envelope = parsed;
+          console.log('Using cached encrypted ' + kind);
+        } else {
+          console.warn(lsKey + ' 是旧明文格式，丢弃并重新拉取');
+          localStorage.removeItem(lsKey);
+        }
       }
     } catch (e) {
-      console.error('Failed to load schedule.json:', e);
+      localStorage.removeItem(lsKey);
+    }
+
+    // 2. 缓存没有则从服务器拉取密文
+    if (!envelope) {
+      try {
+        const res = await fetch(path + '?v=' + Date.now());
+        if (res.ok) envelope = await res.json();
+      } catch (e) {
+        console.error('Failed to load ' + path + ':', e);
+      }
+    }
+    if (!isEnvelope(envelope)) return [];
+
+    // 3. 解密；密码错误（AES-GCM 校验失败）则清除已存密码并重试
+    let firstTry = true;
+    while (true) {
+      const pw = firstTry ? await getPassword() : await askPassword(true);
+      firstTry = false;
+      try {
+        const plain = await decryptEnvelope(envelope, pw);
+        localStorage.setItem(lsKey, JSON.stringify(envelope));
+        return plain;
+      } catch (e) {
+        console.warn('解密失败，可能密码错误，请重试');
+        sessionStorage.removeItem(PW_KEY);
+      }
     }
   }
 
-  // 兜底空数据
-  if (!courses) courses = [];
+  // 1. 加载课表数据（解密后明文只在内存）
+  let courses = await loadEncryptedData('schedule');
 
-  // 1b. 加载考试数据（优先localStorage，其次exams.json）
-  let exams = Storage.loadExams();
-  if (!exams || !exams.length) {
-    // localStorage 没有或为空，重新从服务器拉取
-    try {
-      const res = await fetch('data/exams.json?v=' + Date.now());
-      if (res.ok) {
-        exams = await res.json();
-        Storage.saveExams(exams);
-        console.log('Loaded from exams.json');
-      }
-    } catch (e) {
-      console.error('Failed to load exams.json:', e);
-    }
-  }
-  if (!exams) exams = [];
+  // 1b. 加载考试数据
+  let exams = await loadEncryptedData('exams');
 
   // 2. 初始化课表渲染
   Schedule.init(courses);
@@ -109,7 +198,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 考试安排
   function renderExams() {
-    const examData = Storage.loadExams() || [];
+    const examData = exams || [];
     if (!examData.length) {
       examsContent.innerHTML = '<p class="empty-state">暂无考试数据<br><br>请在电脑端运行<br><code>python -m src.exams_main</code><br>更新考试安排</p>';
       return;
@@ -147,8 +236,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!file) return;
     try {
       const data = await Storage.importFromFile(file);
-      Storage.saveCourses(data);
+      courses = data;
       Schedule.init(data);
+      // 用当前密码加密后缓存密文（明文不落 localStorage）
+      try {
+        const pw = await getPassword();
+        const env = await encryptEnvelope(data, pw);
+        localStorage.setItem(SCHEDULE_KEY, JSON.stringify(env));
+      } catch (cacheErr) {
+        console.error('缓存导入课表失败:', cacheErr);
+      }
       alert('课表导入成功！');
       closeMenu();
     } catch (err) {
@@ -159,8 +256,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 导出课表
   document.getElementById('btn-export').addEventListener('click', () => {
-    const data = Storage.loadCourses() || [];
-    Storage.exportToFile(data, 'njust_schedule.json');
+    Storage.exportToFile(courses || [], 'njust_schedule.json');
     closeMenu();
   });
 
@@ -197,7 +293,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.target === aboutModalOverlay) aboutModalOverlay.hidden = true;
   });
 
-  // 刷新数据（清除localStorage缓存，重新fetch课表+考试）
+  // 刷新数据（清除localStorage密文缓存，重新fetch课表+考试并解密）
   const btnRefresh = document.getElementById('btn-refresh');
   if (btnRefresh) {
     btnRefresh.addEventListener('click', async () => {
@@ -212,11 +308,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // 重新拉取课表
       try {
-        const res = await fetch('data/schedule.json?v=' + Date.now());
+        const res = await fetch('data/schedule.enc.json?v=' + Date.now());
         if (res.ok) {
-          const courses = await res.json();
-          Storage.saveCourses(courses);
-          // 重新渲染课表
+          const env = await res.json();
+          const pw = await getPassword();
+          courses = await decryptEnvelope(env, pw);
+          localStorage.setItem(SCHEDULE_KEY, JSON.stringify(env));
           Schedule.init(courses);
           msg += '课表已更新！共 ' + courses.length + ' 个时间段\n';
         } else {
@@ -228,10 +325,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // 重新拉取考试
       try {
-        const res = await fetch('data/exams.json?v=' + Date.now());
+        const res = await fetch('data/exams.enc.json?v=' + Date.now());
         if (res.ok) {
-          const exams = await res.json();
-          Storage.saveExams(exams);
+          const env = await res.json();
+          const pw = await getPassword();
+          exams = await decryptEnvelope(env, pw);
+          localStorage.setItem(EXAMS_KEY, JSON.stringify(env));
           msg += '考试已更新！共 ' + exams.length + ' 场考试';
         } else {
           msg += '考试拉取失败';

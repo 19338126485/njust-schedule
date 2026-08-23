@@ -123,7 +123,9 @@ python -m src.ics_exporter
 
 ⚠️ **密码不上传服务器**：`src/config.py` 包含你的学号和密码，已加入 `.gitignore`，不会提交到GitHub。所有登录操作都在你的本地电脑上完成。
 
-⚠️ **GitHub Pages只托管静态PWA文件**（HTML/CSS/JS/JSON），不包含任何密码或敏感信息。
+⚠️ **课表数据已加密存储**：仓库和 GitHub Pages 上的 `schedule.enc.json` / `exams.enc.json` 是 AES-256-GCM 密文，打开网页需要输入数据密码（`DATA_PASSWORD`）在浏览器本地解密，密码只存于当前标签页内存（sessionStorage），不会上传。
+
+⚠️ **GitHub Pages只托管静态PWA文件**（HTML/CSS/JS/加密JSON），不包含任何明文课表或敏感信息。
 
 ## 数据来源
 

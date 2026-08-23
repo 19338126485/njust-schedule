@@ -13,3 +13,6 @@ BASE_URL = "http://bkjw.njust.edu.cn"
 # 开学第一周周一日期（用于计算周次，备用）
 # 格式: YYYY-MM-DD
 SEMESTER_START_DATE = "2026-03-02"
+
+# 课表数据加密密码（用于加密网页端课表/考试数据，网页访问时需要输入）
+DATA_PASSWORD = "your-data-password-here"

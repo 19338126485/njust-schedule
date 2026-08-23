@@ -1,6 +1,6 @@
 /* sw.js — Service Worker，让PWA支持离线 */
 
-const CACHE_NAME = 'njust-schedule-v2';
+const CACHE_NAME = 'njust-schedule-v3';
 const PRECACHE = [
   './',
   './index.html',
@@ -8,8 +8,8 @@ const PRECACHE = [
   './js/app.js',
   './js/schedule.js',
   './js/storage.js',
-  './data/schedule.json',
-  './data/exams.json',
+  './data/schedule.enc.json',
+  './data/exams.enc.json',
   './manifest.json'
 ];
 
@@ -41,7 +41,7 @@ self.addEventListener('fetch', (e) => {
       // 离线时 fallback 到缓存
       // 对数据文件（带 ?v=... 时间戳），尝试不带查询参数的缓存匹配
       const url = new URL(e.request.url);
-      if (url.pathname.endsWith('/data/schedule.json') || url.pathname.endsWith('/data/exams.json')) {
+      if (url.pathname.endsWith('/data/schedule.enc.json') || url.pathname.endsWith('/data/exams.enc.json')) {
         const cacheUrl = e.request.url.split('?')[0];
         return caches.match(cacheUrl);
       }

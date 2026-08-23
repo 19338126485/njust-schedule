@@ -15,8 +15,8 @@
 
 | 模块 | 说明 |
 |------|------|
-| 课表抓取 | 浏览器自动化：门户 → 教务系统 → 课表 → 解析HTML → `schedule.json` |
-| 考试抓取 | 浏览器自动化：门户 → 教务系统 → 考试报名 → 查询 → `exams.json` |
+| 课表抓取 | 浏览器自动化：门户 → 教务系统 → 课表 → 解析HTML → 加密为 `schedule.enc.json` |
+| 考试抓取 | 浏览器自动化：门户 → 教务系统 → 考试报名 → 查询 → 加密为 `exams.enc.json` |
 | ICS导出 | 将课表导出为 `.ics` 日历文件，支持手机/电脑日历导入 |
 | PWA手机端 | 离线可用，周视图/日视图，课程弹窗详情 |
 | 一键更新 | 双击 `update.bat` 自动抓取 + push 到 GitHub Pages |
@@ -30,8 +30,8 @@
 
 ```
 ┌─────────────┐    ┌──────────────┐    ┌─────────────┐
-│  教务系统    │───▶│  Python脚本  │───▶│ schedule.json│
-│ (强智+IDS)  │    │ (本地电脑运行) │    │   exams.json  │
+│  教务系统    │───▶│  Python脚本  │───▶│schedule.enc.json│
+│ (强智+IDS)  │    │ (本地电脑运行) │    │ exams.enc.json  │
 └─────────────┘    └──────────────┘    └──────┬──────┘
                                                 │
                                           git push
@@ -52,9 +52,10 @@
 | `src/exam_parser.py` | 考试HTML解析。解析 `<table id="dataList">` |
 | `src/api_client.py` | 强智系统课表HTML解析器。输出前端友好JSON |
 | `src/ics_exporter.py` | ICS日历导出。支持单双周、课前提醒 |
+| `src/crypto_helper.py` | 数据加密。PBKDF2-SHA256(200000) → AES-256-GCM，输出 envelope JSON |
 | `webapp/js/schedule.js` | 课表渲染引擎。Grid布局，周/日视图切换 |
-| `webapp/js/app.js` | PWA主逻辑。数据加载、弹窗、刷新按钮 |
-| `webapp/js/storage.js` | localStorage管理。课表/考试数据的存取 |
+| `webapp/js/app.js` | PWA主逻辑。数据加载（WebCrypto 解密）、密码输入、弹窗、刷新按钮 |
+| `webapp/js/storage.js` | localStorage管理。只存密文 envelope，明文不落盘 |
 | `webapp/sw.js` | Service Worker。网络优先策略，离线可用 |
 
 ---
@@ -80,7 +81,7 @@
 
 `sw.js` 使用网络优先策略（fetch成功就用最新，失败才fallback缓存）。开发阶段避免缓存旧版本。
 
-**已修复**：`sw.js` 在 `fetch` 事件的 `catch` 分支中对 `data/schedule.json` 和 `data/exams.json` 请求做了查询参数剥离，离线时缓存可正确命中。
+**已修复**：`sw.js` 在 `fetch` 事件的 `catch` 分支中对 `data/schedule.enc.json` 和 `data/exams.enc.json` 请求做了查询参数剥离，离线时缓存可正确命中（缓存的是密文 envelope，安全）。
 
 ### 4. 数据格式：前端友好JSON
 

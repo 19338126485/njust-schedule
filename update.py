@@ -7,8 +7,8 @@
     双击 update.bat           # Windows 图形界面
 
 自动完成：
-1. IDS登录 → 抓取课表 → 保存 schedule.json
-2. 浏览器抓取考试 → 保存 exams.json
+1. IDS登录 → 抓取课表 → 加密保存 schedule.enc.json
+2. 浏览器抓取考试 → 加密保存 exams.enc.json
 3. git add → commit → push
 4. GitHub Pages 自动部署（约30秒）
 """
@@ -24,6 +24,34 @@ project_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, project_dir)
 
 from src.config import STUDENT_ID, PASSWORD
+
+try:
+    from src.config import DATA_PASSWORD
+except ImportError:
+    print("❌ 缺少课表数据加密密码 DATA_PASSWORD")
+    print("   请在 src/config.py 中添加一行：")
+    print('   DATA_PASSWORD = "你的数据加密密码"')
+    sys.exit(1)
+
+from src.crypto_helper import encrypt_data
+
+
+def mask_student_id(sid: str) -> str:
+    """学号打码：JY9****0223 形式"""
+    if len(sid) <= 5:
+        return "*" * len(sid)
+    return sid[:3] + "****" + sid[-2:]
+
+
+def save_encrypted(obj, name: str):
+    """加密并保存到 webapp/data 和 docs/data（不落盘明文）"""
+    envelope = encrypt_data(obj, DATA_PASSWORD)
+    for rel_path in [f"webapp/data/{name}.enc.json", f"docs/data/{name}.enc.json"]:
+        full = os.path.join(project_dir, rel_path)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, "w", encoding="utf-8") as f:
+            json.dump(envelope, f, ensure_ascii=False)
+        print(f"   已保存(加密): {rel_path}")
 
 
 def update_schedule():
@@ -47,14 +75,7 @@ def update_schedule():
         return False
 
     print(f"✅ 解析到 {len(courses)} 门课程")
-
-    # 保存到 webapp 和 docs
-    for rel_path in ["webapp/data/schedule.json", "docs/data/schedule.json"]:
-        full = os.path.join(project_dir, rel_path)
-        os.makedirs(os.path.dirname(full), exist_ok=True)
-        with open(full, "w", encoding="utf-8") as f:
-            json.dump(courses, f, ensure_ascii=False, indent=2)
-        print(f"   已保存: {rel_path}")
+    save_encrypted(courses, "schedule")
 
     return True
 
@@ -76,14 +97,7 @@ def update_exams():
     # 解析
     exams = parse_exam_html(html)
     print(f"✅ 解析到 {len(exams)} 场考试")
-
-    # 保存到 webapp 和 docs
-    for rel_path in ["webapp/data/exams.json", "docs/data/exams.json"]:
-        full = os.path.join(project_dir, rel_path)
-        os.makedirs(os.path.dirname(full), exist_ok=True)
-        with open(full, "w", encoding="utf-8") as f:
-            json.dump(exams, f, ensure_ascii=False, indent=2)
-        print(f"   已保存: {rel_path}")
+    save_encrypted(exams, "exams")
 
     return True
 
@@ -96,9 +110,9 @@ def git_push():
 
     os.chdir(project_dir)
 
-    # add
+    # add（只精确添加项目相关目录，避免误提交根目录杂散文件）
     subprocess.run(
-        ["git", "add", "-A"],
+        ["git", "add", "webapp", "docs", "src", ".gitignore"],
         capture_output=True, encoding="utf-8", errors="replace"
     )
 
@@ -156,7 +170,7 @@ def git_push():
 
 def main():
     print("🎓 南理工课表一键更新")
-    print(f"   学号: {STUDENT_ID}")
+    print(f"   学号: {mask_student_id(STUDENT_ID)}")
     print("   流程: 课表 → 考试 → GitHub Pages")
 
     ok_schedule = update_schedule()

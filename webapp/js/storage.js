@@ -57,7 +57,6 @@
         try {
           const data = JSON.parse(e.target.result);
           if (Array.isArray(data)) {
-            saveCourses(data);
             resolve(data);
           } else {
             reject(new Error('文件格式错误'));
